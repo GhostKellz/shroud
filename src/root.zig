@@ -1,24 +1,36 @@
-//! By convention, root.zig is the root source file when making a library.
+//! Shroud v1.0: Unified Cryptographic Framework
+//! Modular architecture integrating all Ghostchain crypto components
 const std = @import("std");
 
-pub fn bufferedPrint() !void {
-    // Stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    // Buffering can improve performance significantly in print-heavy programs.
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+// Core modules
+pub const ghostcipher = @import("ghostcipher");
+pub const sigil = @import("sigil");
+pub const zns = @import("zns");
+pub const ghostwire = @import("ghostwire");
+pub const keystone = @import("keystone");
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+// Advanced modules
+pub const guardian = @import("guardian");
+pub const covenant = @import("covenant");
+pub const shadowcraft = @import("shadowcraft");
 
-    try bw.flush(); // Don't forget to flush!
+// Legacy compatibility exports
+pub const zcrypto = ghostcipher.zcrypto;
+pub const zsig = ghostcipher.zsig;
+pub const realid = sigil;
+
+pub const ShroudError = error{
+    ModuleInitFailed,
+    CryptoError,
+    NetworkError,
+    IdentityError,
+    LedgerError,
+};
+
+pub fn version() []const u8 {
+    return "1.0.0";
 }
 
-pub fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
-
-test "basic add functionality" {
-    try std.testing.expect(add(3, 7) == 10);
+test "shroud module imports" {
+    std.testing.refAllDecls(@This());
 }

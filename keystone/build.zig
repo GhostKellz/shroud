@@ -22,60 +22,29 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
-    // Shroud v1.0 modular architecture - core modules
-    const ghostcipher_mod = b.addModule("ghostcipher", .{
-        .root_source_file = b.path("ghostcipher/root.zig"),
-        .target = target,
-    });
-    
-    const sigil_mod = b.addModule("sigil", .{
-        .root_source_file = b.path("sigil/root.zig"),
-        .target = target,
-    });
-    
-    const zns_mod = b.addModule("zns", .{
-        .root_source_file = b.path("zns/root.zig"),
-        .target = target,
-    });
-    
-    const ghostwire_mod = b.addModule("ghostwire", .{
-        .root_source_file = b.path("ghostwire/root.zig"),
-        .target = target,
-    });
-    
-    const keystone_mod = b.addModule("keystone", .{
-        .root_source_file = b.path("keystone/root.zig"),
-        .target = target,
-    });
-    
-    const guardian_mod = b.addModule("guardian", .{
-        .root_source_file = b.path("guardian/root.zig"),
-        .target = target,
-    });
-    
-    const covenant_mod = b.addModule("covenant", .{
-        .root_source_file = b.path("covenant/root.zig"),
-        .target = target,
-    });
-    
-    const shadowcraft_mod = b.addModule("shadowcraft", .{
-        .root_source_file = b.path("shadowcraft/root.zig"),
-        .target = target,
-    });
+    // Get zcrypto dependency
+    const zcrypto = b.dependency("zcrypto", .{});
 
-    // Main shroud module that aggregates everything
-    const mod = b.addModule("shroud", .{
+    // This creates a module, which represents a collection of source files alongside
+    // some compilation options, such as optimization mode and linked system libraries.
+    // Zig modules are the preferred way of making Zig code available to consumers.
+    // addModule defines a module that we intend to make available for importing
+    // to our consumers. We must give it a name because a Zig package can expose
+    // multiple modules and consumers will need to be able to specify which
+    // module they want to access.
+    const mod = b.addModule("zledger", .{
+        // The root source file is the "entry point" of this module. Users of
+        // this module will only be able to access public declarations contained
+        // in this file, which means that if you have declarations that you
+        // intend to expose to consumers that were defined in other files part
+        // of this module, you will have to make sure to re-export them from
+        // the root file.
         .root_source_file = b.path("src/root.zig"),
+        // Later on we'll use this module as the root module of a test executable
+        // which requires us to specify a target.
         .target = target,
         .imports = &.{
-            .{ .name = "ghostcipher", .module = ghostcipher_mod },
-            .{ .name = "sigil", .module = sigil_mod },
-            .{ .name = "zns", .module = zns_mod },
-            .{ .name = "ghostwire", .module = ghostwire_mod },
-            .{ .name = "keystone", .module = keystone_mod },
-            .{ .name = "guardian", .module = guardian_mod },
-            .{ .name = "covenant", .module = covenant_mod },
-            .{ .name = "shadowcraft", .module = shadowcraft_mod },
+            .{ .name = "zcrypto", .module = zcrypto.module("zcrypto") },
         },
     });
 
@@ -96,7 +65,7 @@ pub fn build(b: *std.Build) void {
     // If neither case applies to you, feel free to delete the declaration you
     // don't need and to put everything under a single module.
     const exe = b.addExecutable(.{
-        .name = "shroud",
+        .name = "zledger",
         .root_module = b.createModule(.{
             // b.createModule defines a new module just like b.addModule but,
             // unlike b.addModule, it does not expose the module to consumers of
@@ -111,12 +80,13 @@ pub fn build(b: *std.Build) void {
             // List of modules available for import in source files part of the
             // root module.
             .imports = &.{
-                // Here "shroud" is the name you will use in your source code to
-                // import this module (e.g. `@import("shroud")`). The name is
+                // Here "zledger" is the name you will use in your source code to
+                // import this module (e.g. `@import("zledger")`). The name is
                 // repeated because you are allowed to rename your imports, which
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
-                .{ .name = "shroud", .module = mod },
+                .{ .name = "zledger", .module = mod },
+                .{ .name = "zcrypto", .module = zcrypto.module("zcrypto") },
             },
         }),
     });

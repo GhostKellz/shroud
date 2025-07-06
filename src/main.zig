@@ -4,7 +4,7 @@ const shroud = @import("shroud");
 pub fn main() !void {
     // Prints to stderr, ignoring potential errors.
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try shroud.bufferedPrint();
+    std.debug.print("Shroud v{s} - Unified Cryptographic Framework\n", .{shroud.version()});
 }
 
 test "simple test" {
