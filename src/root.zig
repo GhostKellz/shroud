@@ -13,6 +13,7 @@ pub const keystone = @import("keystone");
 pub const guardian = @import("guardian");
 pub const covenant = @import("covenant");
 pub const shadowcraft = @import("shadowcraft");
+pub const gwallet = @import("gwallet");
 
 // Legacy compatibility exports
 pub const zcrypto = ghostcipher.zcrypto;
@@ -28,7 +29,7 @@ pub const ShroudError = error{
 };
 
 pub fn version() []const u8 {
-    return "1.0.0";
+    return "0.2.0";
 }
 
 test "shroud module imports" {

@@ -39,6 +39,7 @@ Shroud consists of 8 core modules organized into three tiers:
 - **`shadowcraft`** - Identity enforcement and zero-trust logic
 - **`guardian`** - Multi-signature and access control
 - **`covenant`** - Smart contract policy engine
+- **`gwallet`** - GhostWallet: Secure programmable wallet with RealID integration
 
 ---
 
@@ -164,6 +165,26 @@ Covenant handles conditional validation:
 - **Contract Validation**: Smart contract rule enforcement
 - **Conditional Logic**: Complex validation scenarios
 - **Integration Hooks**: Pluggable validation system
+
+### 👻 GWallet (GhostWallet)
+*Secure programmable wallet with Sigil identity integration*
+
+GhostWallet provides comprehensive wallet functionality:
+
+- **Identity Integration**: Built on Sigil identity framework
+- **Multi-Protocol Support**: Bitcoin, Ethereum, Ghostchain, and custom chains
+- **HD Wallet**: Hierarchical deterministic key management
+- **Web3 Bridge**: dApp integration via HTTP/WebSocket bridge
+- **Command-Line Interface**: Full-featured CLI for wallet operations
+- **FFI Support**: C/Rust integration for blockchain services
+
+**Key Features:**
+- Deterministic wallet generation from passphrases
+- QID-based network addressing
+- Encrypted storage with Sigil signatures
+- Multi-signature transaction support
+- Bridge mode for dApp integration
+- CLI with comprehensive wallet operations
 
 ---
 
@@ -304,7 +325,7 @@ Shroud is designed to minimize external dependencies:
 Shroud powers and integrates with:
 
 - **Ghostchain**: Primary blockchain implementation
-- **ZWallet**: Cryptocurrency wallet infrastructure  
+- **GhostWallet**: Secure programmable wallet (integrated as gwallet module)  
 - **GhostBridge**: Cross-chain bridge protocol
 - **Wraith**: Privacy-enhanced communication layer
 - **ZVM**: Zero-knowledge virtual machine

@@ -24,6 +24,7 @@ It powers key components of the **Ghostchain** protocol stack, and enables zero-
 | `shadowcraft` | Identity enforcement and zero-trust logic engine (AuthContext, policies) |
 | `guardian`    | Multi-sig, watchdog enforcement, identity-level access control           |
 | `covenant`    | Smart contract policy ruleset engine for conditional validation          |
+| `gwallet`     | GhostWallet: Secure programmable wallet with Sigil identity integration |
 
 ---
 
@@ -37,6 +38,45 @@ It powers key components of the **Ghostchain** protocol stack, and enables zero-
 * **`shadowcraft`** – Runtime identity enforcement (AuthContext)
 * **`guardian`** – Access and signature enforcement
 * **`covenant`** – Contract rules, validation logic
+* **`gwallet`** – GhostWallet CLI and library for secure wallet operations
+
+---
+
+## 🚀 Quick Start
+
+### GhostWallet (gwallet)
+```bash
+# Build and run GhostWallet
+zig build gwallet
+
+# Create a new wallet
+./zig-out/bin/gwallet generate --type ed25519 --name myname
+
+# Import existing wallet
+./zig-out/bin/gwallet import --mnemonic "word1 word2 ..."
+
+# Check balance
+./zig-out/bin/gwallet balance --token gcc
+
+# Send tokens
+./zig-out/bin/gwallet send --to recipient.ghost --amount 420 --token gcc
+
+# Start Web3 bridge for dApp integration
+./zig-out/bin/gwallet --bridge --port 8080
+```
+
+### Library Usage
+```zig
+const shroud = @import("shroud");
+
+// Access GhostWallet functionality
+const wallet = try shroud.gwallet.createWallet(allocator, "passphrase", .hybrid);
+defer wallet.deinit();
+
+// Use other Shroud modules
+const identity = try shroud.sigil.createIdentity(allocator);
+const domain_result = try shroud.zns.resolve("example.ghost");
+```
 
 ---
 

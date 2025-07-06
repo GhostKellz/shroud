@@ -15,6 +15,7 @@
 - [ShadowCraft API](#shadowcraft-api)
 - [Guardian API](#guardian-api)
 - [Covenant API](#covenant-api)
+- [GWallet API](#gwallet-api)
 - [Error Handling](#error-handling)
 - [FFI Bindings](#ffi-bindings)
 
@@ -48,6 +49,7 @@ pub const zns = @import("zns");
 pub const shadowcraft = @import("shadowcraft");
 pub const guardian = @import("guardian");
 pub const covenant = @import("covenant");
+pub const gwallet = @import("gwallet");
 
 // Legacy compatibility
 pub const zcrypto = ghostcipher.zcrypto;
@@ -936,6 +938,239 @@ pub const Decision = enum {
     pending_approval,
     delayed,
 };
+```
+
+---
+
+## GWallet API
+
+### Wallet Management
+
+```zig
+const gwallet = shroud.gwallet;
+
+// Core types
+pub const Wallet = struct {
+    pub fn create(allocator: std.mem.Allocator, passphrase: []const u8, mode: WalletMode, mnemonic: ?[]const u8) !Wallet;
+    pub fn fromMnemonic(allocator: std.mem.Allocator, mnemonic: []const u8, password: ?[]const u8, mode: WalletMode) !Wallet;
+    pub fn deinit(self: *Wallet) void;
+    pub fn lock(self: *Wallet) void;
+    pub fn unlock(self: *Wallet, passphrase: []const u8) !void;
+    pub fn isLocked(self: Wallet) bool;
+};
+
+pub const Account = struct {
+    address: []const u8,
+    public_key: []const u8,
+    qid: sigil.QID,
+    protocol: Protocol,
+    key_type: KeyType,
+    balance: keystone.FixedPoint,
+};
+
+pub const WalletMode = enum {
+    public_identity,
+    private_identity,
+    hybrid,
+    device_bound,
+};
+
+pub const Protocol = enum {
+    bitcoin,
+    ethereum,
+    ghostchain,
+    generic,
+};
+
+pub const KeyType = enum {
+    ed25519,
+    secp256k1,
+    rsa,
+};
+
+pub const WalletError = error{
+    InvalidPassphrase,
+    WalletLocked,
+    InsufficientFunds,
+    InvalidAddress,
+    SigningFailed,
+    QIDGenerationFailed,
+    DeviceBindingFailed,
+    InvalidAccountType,
+    AccountNotFound,
+};
+
+// Wallet operations
+pub fn createWallet(allocator: std.mem.Allocator, passphrase: []const u8, mode: WalletMode) !Wallet;
+pub fn importWallet(allocator: std.mem.Allocator, mnemonic: []const u8, password: ?[]const u8, mode: WalletMode) !Wallet;
+pub fn resolveIdentity(allocator: std.mem.Allocator, domain: []const u8) ![]const u8;
+pub fn startBridge(allocator: std.mem.Allocator, port: u16) !BridgeServer;
+```
+
+### Transaction Management
+
+```zig
+pub const Transaction = struct {
+    id: []const u8,
+    from_address: []const u8,
+    to_address: []const u8,
+    amount: keystone.FixedPoint,
+    fee: keystone.FixedPoint,
+    nonce: u64,
+    gas_limit: u64,
+    gas_price: keystone.FixedPoint,
+    data: []const u8,
+    signature: ?sigil.RealIDSignature,
+    protocol: Protocol,
+    status: TransactionStatus,
+    
+    pub fn init(allocator: std.mem.Allocator, from: []const u8, to: []const u8, amount: keystone.FixedPoint, protocol: Protocol) !Transaction;
+    pub fn deinit(self: *Transaction, allocator: std.mem.Allocator) void;
+    pub fn sign(self: *Transaction, private_key: sigil.RealIDPrivateKey) !void;
+    pub fn verify(self: Transaction, public_key: sigil.RealIDPublicKey) bool;
+    pub fn hash(self: Transaction, allocator: std.mem.Allocator) ![]u8;
+};
+
+pub const TransactionStatus = enum {
+    pending,
+    confirmed,
+    failed,
+    dropped,
+};
+```
+
+### CLI Interface
+
+```zig
+pub const CLI = struct {
+    pub fn init(allocator: std.mem.Allocator) CLI;
+    pub fn deinit(self: *CLI) void;
+    pub fn run(self: *CLI, args: [][]const u8) !void;
+    
+    // Command handlers
+    pub fn handleGenerate(self: *CLI, args: [][]const u8) !void;
+    pub fn handleImport(self: *CLI, args: [][]const u8) !void;
+    pub fn handleBalance(self: *CLI, args: [][]const u8) !void;
+    pub fn handleSend(self: *CLI, args: [][]const u8) !void;
+    pub fn handleReceive(self: *CLI, args: [][]const u8) !void;
+    pub fn handleAccounts(self: *CLI, args: [][]const u8) !void;
+    pub fn handleUnlock(self: *CLI, args: [][]const u8) !void;
+    pub fn handleLock(self: *CLI, args: [][]const u8) !void;
+};
+
+pub const Command = enum {
+    help,
+    generate,
+    import,
+    balance,
+    send,
+    receive,
+    accounts,
+    unlock,
+    lock,
+    bridge,
+    version,
+};
+```
+
+### Web3 Bridge
+
+```zig
+pub const Bridge = struct {
+    pub fn init(allocator: std.mem.Allocator, config: BridgeConfig) !Bridge;
+    pub fn deinit(self: *Bridge) void;
+    pub fn start(self: *Bridge) !void;
+    pub fn stop(self: *Bridge) void;
+    pub fn addWallet(self: *Bridge, wallet: *Wallet) !void;
+    pub fn removeWallet(self: *Bridge, wallet_id: []const u8) !void;
+};
+
+pub const BridgeConfig = struct {
+    port: u16 = 8080,
+    enable_cors: bool = true,
+    allowed_origins: [][]const u8 = &.{},
+    max_connections: u32 = 100,
+    timeout_ms: u32 = 30000,
+};
+
+pub const BridgeServer = struct {
+    pub fn init(allocator: std.mem.Allocator, port: u16) !BridgeServer;
+    pub fn deinit(self: *BridgeServer) void;
+    pub fn start(self: *BridgeServer) !void;
+    pub fn stop(self: *BridgeServer) void;
+};
+
+pub const WraithBridge = struct {
+    pub fn init(allocator: std.mem.Allocator, config: WraithConfig) !WraithBridge;
+    pub fn deinit(self: *WraithBridge) void;
+    pub fn connect(self: *WraithBridge, endpoint: []const u8) !void;
+    pub fn disconnect(self: *WraithBridge) void;
+    pub fn sendTransaction(self: *WraithBridge, transaction: Transaction) ![]const u8;
+    pub fn getBalance(self: *WraithBridge, address: []const u8) !keystone.FixedPoint;
+};
+
+pub const WraithConfig = struct {
+    endpoint: []const u8,
+    timeout_ms: u32 = 30000,
+    retry_attempts: u8 = 3,
+    enable_encryption: bool = true,
+};
+```
+
+### Identity Resolution
+
+```zig
+pub const Identity = struct {
+    public_key: sigil.RealIDPublicKey,
+    qid: sigil.QID,
+    domain: ?[]const u8,
+    
+    pub fn fromPublicKey(public_key: sigil.RealIDPublicKey) Identity;
+    pub fn fromDomain(allocator: std.mem.Allocator, domain: []const u8) !Identity;
+    pub fn getAddress(self: Identity, protocol: Protocol, allocator: std.mem.Allocator) ![]u8;
+};
+
+pub const IdentityResolver = struct {
+    pub fn init(allocator: std.mem.Allocator) IdentityResolver;
+    pub fn deinit(self: *IdentityResolver) void;
+    pub fn resolve(self: *IdentityResolver, domain: []const u8) ![]const u8;
+    pub fn register(self: *IdentityResolver, domain: []const u8, identity: sigil.RealIDKeyPair) !void;
+};
+```
+
+### FFI Interface
+
+```zig
+// C-compatible FFI types for integration with walletd/ghostd
+pub const GWalletContext = extern struct {
+    wallet_ptr: ?*anyopaque,
+    allocator_ptr: ?*anyopaque,
+    is_valid: bool,
+};
+
+pub const WalletAccount = extern struct {
+    address: [64]u8,
+    address_len: u32,
+    public_key: [32]u8,
+    qid: [16]u8,
+    protocol: u32,
+    key_type: u32,
+};
+
+pub const SignatureResult = extern struct {
+    signature: [64]u8,
+    success: bool,
+};
+
+// FFI functions
+extern fn gwallet_init() GWalletContext;
+extern fn gwallet_destroy(ctx: *GWalletContext) void;
+extern fn gwallet_create_wallet(ctx: *GWalletContext, passphrase: [*:0]const u8, mode: u32) c_int;
+extern fn gwallet_unlock_wallet(ctx: *GWalletContext, passphrase: [*:0]const u8) c_int;
+extern fn gwallet_lock_wallet(ctx: *GWalletContext) c_int;
+extern fn gwallet_create_account(ctx: *GWalletContext, protocol: u32, key_type: u32, account: *WalletAccount) c_int;
+extern fn gwallet_sign_transaction(ctx: *GWalletContext, tx_data: [*]const u8, tx_len: usize, result: *SignatureResult) c_int;
+extern fn gwallet_verify_signature(signature: [*]const u8, data: [*]const u8, data_len: usize, public_key: [*]const u8) bool;
 ```
 
 ---

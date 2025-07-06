@@ -31,6 +31,9 @@ pub fn build(b: *std.Build) void {
     const sigil_mod = b.addModule("sigil", .{
         .root_source_file = b.path("sigil/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "zcrypto", .module = ghostcipher_mod },
+        },
     });
     
     const zns_mod = b.addModule("zns", .{
@@ -62,6 +65,15 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("shadowcraft/root.zig"),
         .target = target,
     });
+    
+    const gwallet_mod = b.addModule("gwallet", .{
+        .root_source_file = b.path("gwallet/src/root.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "sigil", .module = sigil_mod },
+            .{ .name = "ghostcipher", .module = ghostcipher_mod },
+        },
+    });
 
     // Main shroud module that aggregates everything
     const mod = b.addModule("shroud", .{
@@ -76,6 +88,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "guardian", .module = guardian_mod },
             .{ .name = "covenant", .module = covenant_mod },
             .{ .name = "shadowcraft", .module = shadowcraft_mod },
+            .{ .name = "gwallet", .module = gwallet_mod },
         },
     });
 
@@ -179,6 +192,31 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    // GWallet CLI executable
+    const gwallet_exe = b.addExecutable(.{
+        .name = "gwallet",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("gwallet/src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "gwallet", .module = gwallet_mod },
+            },
+        }),
+    });
+
+    b.installArtifact(gwallet_exe);
+
+    // GWallet run step
+    const gwallet_run_step = b.step("gwallet", "Run GhostWallet CLI");
+    const gwallet_run_cmd = b.addRunArtifact(gwallet_exe);
+    gwallet_run_step.dependOn(&gwallet_run_cmd.step);
+    gwallet_run_cmd.step.dependOn(b.getInstallStep());
+
+    if (b.args) |args| {
+        gwallet_run_cmd.addArgs(args);
+    }
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

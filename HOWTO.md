@@ -500,7 +500,190 @@ pub fn walletExample() !void {
 }
 ```
 
-### 4. Decentralized Domain Resolution
+### 4. GhostWallet Integration
+
+```zig
+// src/crypto/ghostwallet.zig
+const std = @import("std");
+const shroud = @import("shroud");
+
+pub const GhostWalletService = struct {
+    allocator: std.mem.Allocator,
+    wallet: shroud.gwallet.Wallet,
+    bridge: shroud.gwallet.BridgeServer,
+    identity_resolver: shroud.gwallet.IdentityResolver,
+
+    pub fn init(allocator: std.mem.Allocator, master_passphrase: []const u8, bridge_port: u16) !GhostWalletService {
+        // Create GhostWallet with Sigil identity
+        var wallet = try shroud.gwallet.createWallet(allocator, master_passphrase, .hybrid);
+        
+        // Initialize Web3 bridge for dApp integration
+        var bridge = try shroud.gwallet.startBridge(allocator, bridge_port);
+        
+        // Setup identity resolver for domain resolution
+        var identity_resolver = shroud.gwallet.IdentityResolver.init(allocator);
+
+        return GhostWalletService{
+            .allocator = allocator,
+            .wallet = wallet,
+            .bridge = bridge,
+            .identity_resolver = identity_resolver,
+        };
+    }
+
+    pub fn deinit(self: *GhostWalletService) void {
+        self.wallet.deinit();
+        self.bridge.deinit();
+        self.identity_resolver.deinit();
+    }
+
+    pub fn createAccount(self: *GhostWalletService, protocol: shroud.gwallet.Protocol, name: []const u8) !shroud.gwallet.Account {
+        // Create account with Sigil identity
+        return try self.wallet.createAccount(protocol, name);
+    }
+
+    pub fn sendTransaction(
+        self: *GhostWalletService,
+        from_account: shroud.gwallet.Account,
+        to_address: []const u8,
+        amount: shroud.keystone.FixedPoint,
+        protocol: shroud.gwallet.Protocol
+    ) ![]const u8 {
+        // Create transaction
+        var transaction = try shroud.gwallet.Transaction.init(
+            self.allocator,
+            from_account.address,
+            to_address,
+            amount,
+            protocol
+        );
+        defer transaction.deinit(self.allocator);
+
+        // Sign with account's Sigil identity
+        try transaction.sign(from_account.private_key);
+
+        // Submit to network
+        return try self.submitTransaction(transaction);
+    }
+
+    pub fn resolveWalletAddress(self: *GhostWalletService, domain: []const u8) ![]const u8 {
+        // Resolve domain to wallet address using ZNS
+        return try self.identity_resolver.resolve(domain);
+    }
+
+    pub fn getBalance(self: *GhostWalletService, account: shroud.gwallet.Account, token: []const u8) !shroud.keystone.FixedPoint {
+        // Get balance for specific token/currency
+        // This would typically query the respective blockchain
+        return account.balance;
+    }
+
+    pub fn startWebBridge(self: *GhostWalletService) !void {
+        // Start Web3 bridge for dApp integration
+        try self.bridge.start();
+        std.debug.print("GhostWallet Web3 bridge started on port {d}\n", .{self.bridge.port});
+    }
+
+    fn submitTransaction(self: *GhostWalletService, transaction: shroud.gwallet.Transaction) ![]const u8 {
+        // Submit transaction to appropriate network based on protocol
+        switch (transaction.protocol) {
+            .bitcoin => return try self.submitBitcoinTransaction(transaction),
+            .ethereum => return try self.submitEthereumTransaction(transaction),
+            .ghostchain => return try self.submitGhostchainTransaction(transaction),
+            .generic => return try self.submitGenericTransaction(transaction),
+        }
+    }
+
+    fn submitBitcoinTransaction(self: *GhostWalletService, transaction: shroud.gwallet.Transaction) ![]const u8 {
+        // Bitcoin-specific transaction submission
+        const tx_hash = try transaction.hash(self.allocator);
+        defer self.allocator.free(tx_hash);
+        
+        std.debug.print("Submitting Bitcoin transaction: {s}\n", .{std.fmt.fmtSliceHexLower(tx_hash)});
+        return try self.allocator.dupe(u8, tx_hash);
+    }
+
+    fn submitEthereumTransaction(self: *GhostWalletService, transaction: shroud.gwallet.Transaction) ![]const u8 {
+        // Ethereum-specific transaction submission
+        const tx_hash = try transaction.hash(self.allocator);
+        defer self.allocator.free(tx_hash);
+        
+        std.debug.print("Submitting Ethereum transaction: {s}\n", .{std.fmt.fmtSliceHexLower(tx_hash)});
+        return try self.allocator.dupe(u8, tx_hash);
+    }
+
+    fn submitGhostchainTransaction(self: *GhostWalletService, transaction: shroud.gwallet.Transaction) ![]const u8 {
+        // Ghostchain-specific transaction submission with enhanced privacy
+        const tx_hash = try transaction.hash(self.allocator);
+        defer self.allocator.free(tx_hash);
+        
+        std.debug.print("Submitting Ghostchain transaction: {s}\n", .{std.fmt.fmtSliceHexLower(tx_hash)});
+        return try self.allocator.dupe(u8, tx_hash);
+    }
+
+    fn submitGenericTransaction(self: *GhostWalletService, transaction: shroud.gwallet.Transaction) ![]const u8 {
+        // Generic transaction submission
+        const tx_hash = try transaction.hash(self.allocator);
+        defer self.allocator.free(tx_hash);
+        
+        std.debug.print("Submitting generic transaction: {s}\n", .{std.fmt.fmtSliceHexLower(tx_hash)});
+        return try self.allocator.dupe(u8, tx_hash);
+    }
+};
+
+// Example usage
+pub fn ghostWalletExample() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var ghost_wallet = try GhostWalletService.init(
+        allocator,
+        "secure_master_passphrase_for_wallet",
+        8080
+    );
+    defer ghost_wallet.deinit();
+
+    // Create accounts for different protocols
+    const btc_account = try ghost_wallet.createAccount(.bitcoin, "Bitcoin Main");
+    const eth_account = try ghost_wallet.createAccount(.ethereum, "Ethereum Main");
+    const ghost_account = try ghost_wallet.createAccount(.ghostchain, "Ghost Privacy");
+
+    std.debug.print("Created accounts:\n");
+    std.debug.print("Bitcoin: {s}\n", .{btc_account.address});
+    std.debug.print("Ethereum: {s}\n", .{eth_account.address});
+    std.debug.print("Ghostchain: {s}\n", .{ghost_account.address});
+
+    // Send transaction using domain resolution
+    const recipient_address = try ghost_wallet.resolveWalletAddress("alice.ghost");
+    defer allocator.free(recipient_address);
+
+    const amount = shroud.keystone.FixedPoint.fromFloat(1.5, 8); // 1.5 tokens
+    const tx_hash = try ghost_wallet.sendTransaction(
+        ghost_account,
+        recipient_address,
+        amount,
+        .ghostchain
+    );
+    defer allocator.free(tx_hash);
+
+    std.debug.print("Transaction sent: {s}\n", .{tx_hash});
+
+    // Start Web3 bridge for dApp integration
+    try ghost_wallet.startWebBridge();
+    
+    // Check balances
+    const btc_balance = try ghost_wallet.getBalance(btc_account, "BTC");
+    const eth_balance = try ghost_wallet.getBalance(eth_account, "ETH");
+    const ghost_balance = try ghost_wallet.getBalance(ghost_account, "GHOST");
+
+    std.debug.print("Balances:\n");
+    std.debug.print("Bitcoin: {}\n", .{btc_balance.toFloat()});
+    std.debug.print("Ethereum: {}\n", .{eth_balance.toFloat()});
+    std.debug.print("Ghostchain: {}\n", .{ghost_balance.toFloat()});
+}
+```
+
+### 5. Decentralized Domain Resolution
 
 ```zig
 // src/network/domain_resolver.zig
@@ -1025,6 +1208,13 @@ pub const CrossChainBridge = struct {
    - [ ] Configure caching
    - [ ] Plan for domain governance
 
+6. **Wallet Layer (GhostWallet)**
+   - [ ] Initialize wallet with Sigil identity
+   - [ ] Create accounts for required protocols
+   - [ ] Setup Web3 bridge for dApp integration
+   - [ ] Configure transaction signing
+   - [ ] Implement domain-based address resolution
+
 ### Common Integration Patterns
 
 #### Pattern 1: DeFi Protocol
@@ -1035,6 +1225,7 @@ const DeFiProtocol = struct {
     treasury: Treasury,
     domain_service: DomainService,
     bridge_service: CrossChainBridge,
+    wallet_service: GhostWalletService,
     
     pub fn init(allocator: std.mem.Allocator, config: DeFiConfig) !DeFiProtocol {
         // Initialize all Shroud components
@@ -1042,12 +1233,14 @@ const DeFiProtocol = struct {
         const treasury = try Treasury.init(allocator, config.multisig_threshold, config.signer_passphrases);
         const domain_service = try DomainService.init(allocator, config.cache_path, config.domain_passphrase);
         const bridge_service = try CrossChainBridge.init(allocator, config.bridge_passphrase, config.bridge_port, config.validator_passphrases);
+        const wallet_service = try GhostWalletService.init(allocator, config.wallet_passphrase, config.wallet_bridge_port);
         
         return DeFiProtocol{
             .identity_manager = identity_manager,
             .treasury = treasury,
             .domain_service = domain_service,
             .bridge_service = bridge_service,
+            .wallet_service = wallet_service,
         };
     }
     
