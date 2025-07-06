@@ -1,5 +1,15 @@
 # 🕸️ Shroud
 
+[![Zig Version](https://img.shields.io/badge/Zig-0.15.0-orange.svg)](https://ziglang.org/)
+[![Blockchain](https://img.shields.io/badge/Blockchain-Ghostchain-purple.svg)](https://ghostchain.org/)
+[![Layer 2](https://img.shields.io/badge/Layer%202-Compatible-blueviolet.svg)](https://ethereum.org/en/layer-2/)
+[![Crypto](https://img.shields.io/badge/Crypto-zcrypto-blue.svg)](https://github.com/ghostchain/zcrypto)
+[![ENS](https://img.shields.io/badge/ENS-Compatible-lightblue.svg)](https://ens.domains/)
+[![Web3](https://img.shields.io/badge/Web3-Compatible-brightgreen.svg)](https://web3.foundation/)
+[![QUIC](https://img.shields.io/badge/Protocol-QUIC-green.svg)](https://quicwg.org/)
+[![HTTP/3](https://img.shields.io/badge/Protocol-HTTP%2F3-brightgreen.svg)](https://httpwg.org/specs/rfc9114.html)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > A high-performance, zero-trust cryptographic and network framework for Ghostchain and the Web5 ecosystem.
 
 ---
