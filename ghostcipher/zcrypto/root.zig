@@ -34,6 +34,9 @@ pub const util = @import("util.zig");
 pub const bip = @import("bip.zig");
 pub const batch = @import("batch.zig");
 
+// Test vectors for compliance verification
+pub const test_vectors = @import("test_vectors.zig");
+
 // Post-quantum cryptography module
 pub const pq = @import("pq.zig");
 
@@ -61,4 +64,5 @@ test {
     _ = tls;
     _ = quic;
     _ = ffi;
+    _ = test_vectors;
 }

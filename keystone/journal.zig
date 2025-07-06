@@ -2,7 +2,7 @@ const std = @import("std");
 const tx = @import("tx.zig");
 const crypto = std.crypto;
 const crypto_storage = @import("crypto_storage.zig");
-const zcrypto = @import("zcrypto");
+const zcrypto = @import("ghostcipher").zcrypto;
 
 pub const JournalEntry = struct {
     transaction: tx.Transaction,
@@ -23,7 +23,7 @@ pub const JournalEntry = struct {
 
     pub fn verify(self: JournalEntry, allocator: std.mem.Allocator) !bool {
         const expected_hash = try calculateEntryHash(allocator, self.transaction, self.prev_hash, self.sequence);
-        return zcrypto.util.constantTimeCompare(&self.hash, &expected_hash);
+        return std.crypto.utils.timingSafeEql([32]u8, &self.hash, &expected_hash);
     }
 };
 
@@ -103,7 +103,7 @@ pub const Journal = struct {
             
             if (i > 0) {
                 const prev_entry = self.entries.items[i - 1];
-                if (entry.prev_hash == null or !zcrypto.util.constantTimeCompare(&(entry.prev_hash.?), &prev_entry.hash)) {
+                if (entry.prev_hash == null or !std.crypto.utils.timingSafeEql([32]u8, &(entry.prev_hash.?), &prev_entry.hash)) {
                     return false;
                 }
             } else {
@@ -242,7 +242,7 @@ test "journal operations" {
     const second_entry = journal.getEntry(1).?;
     try std.testing.expectEqual(@as(u64, 1), second_entry.sequence);
     try std.testing.expect(second_entry.prev_hash != null);
-    try std.testing.expect(zcrypto.util.constantTimeCompare(&(second_entry.prev_hash.?), &first_entry.hash));
+    try std.testing.expect(std.crypto.utils.timingSafeEql([32]u8, &(second_entry.prev_hash.?), &first_entry.hash));
 }
 
 test "journal file persistence" {

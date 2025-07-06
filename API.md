@@ -51,10 +51,10 @@ pub const guardian = @import("guardian");
 pub const covenant = @import("covenant");
 pub const gwallet = @import("gwallet");
 
-// Legacy compatibility
-pub const zcrypto = ghostcipher.zcrypto;
-pub const zsig = ghostcipher.zsig;
-pub const realid = sigil;
+// Clean v0.4.0 API - Access modules directly:
+// shroud.ghostcipher.zcrypto (replaces old zcrypto)
+// shroud.ghostcipher.zsig (replaces old zsig)  
+// shroud.sigil (replaces old realid)
 ```
 
 ### Module Integration

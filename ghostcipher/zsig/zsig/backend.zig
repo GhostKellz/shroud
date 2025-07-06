@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-// Import zcrypto if available
-const zcrypto = @import("zcrypto");
+// Import zcrypto from parent module
+const zcrypto = @import("../../zcrypto/root.zig");
 
 pub const PUBLIC_KEY_SIZE = 32;
 pub const PRIVATE_KEY_SIZE = 64;

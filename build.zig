@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("sigil/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "zcrypto", .module = ghostcipher_mod },
+            .{ .name = "ghostcipher", .module = ghostcipher_mod },
         },
     });
     
@@ -216,6 +216,31 @@ pub fn build(b: *std.Build) void {
 
     if (b.args) |args| {
         gwallet_run_cmd.addArgs(args);
+    }
+
+    // Benchmark executable
+    const bench_exe = b.addExecutable(.{
+        .name = "shroud-bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "shroud", .module = mod },
+            },
+        }),
+    });
+
+    b.installArtifact(bench_exe);
+
+    // Benchmark run step
+    const bench_run_step = b.step("bench", "Run Shroud performance benchmarks");
+    const bench_run_cmd = b.addRunArtifact(bench_exe);
+    bench_run_step.dependOn(&bench_run_cmd.step);
+    bench_run_cmd.step.dependOn(b.getInstallStep());
+
+    if (b.args) |args| {
+        bench_run_cmd.addArgs(args);
     }
 
     // Just like flags, top level steps are also listed in the `--help` menu.

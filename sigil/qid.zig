@@ -1,5 +1,5 @@
 const std = @import("std");
-const zcrypto = @import("zcrypto").zcrypto;
+const zcrypto = @import("ghostcipher").zcrypto;
 const types = @import("types.zig");
 
 const RealIDPublicKey = types.RealIDPublicKey;

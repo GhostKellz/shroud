@@ -15,10 +15,8 @@ pub const covenant = @import("covenant");
 pub const shadowcraft = @import("shadowcraft");
 pub const gwallet = @import("gwallet");
 
-// Legacy compatibility exports
-pub const zcrypto = ghostcipher.zcrypto;
-pub const zsig = ghostcipher.zsig;
-pub const realid = sigil;
+// Clean v0.4.0 API - no legacy compatibility
+// Use: shroud.ghostcipher.zcrypto, shroud.ghostcipher.zsig, shroud.sigil
 
 pub const ShroudError = error{
     ModuleInitFailed,
@@ -29,7 +27,7 @@ pub const ShroudError = error{
 };
 
 pub fn version() []const u8 {
-    return "0.3.0";
+    return "0.4.0";
 }
 
 test "shroud module imports" {

@@ -14,6 +14,15 @@ pub const Sha512Hash = [64]u8;
 /// Blake2b hash result
 pub const Blake2bHash = [64]u8;
 
+/// Blake3 hash result
+pub const Blake3Hash = [32]u8;
+
+/// SHA3-256 hash result
+pub const Sha3_256Hash = [32]u8;
+
+/// SHA3-512 hash result
+pub const Sha3_512Hash = [64]u8;
+
 /// HMAC-SHA256 result
 pub const HmacSha256Hash = [32]u8;
 
@@ -42,6 +51,27 @@ pub fn blake2b(data: []const u8) Blake2bHash {
     var result: Blake2bHash = undefined;
     std.crypto.hash.blake2.Blake2b512.hash(data, &result, .{});
     return result;
+}
+
+/// Compute Blake3 hash of input data
+pub fn blake3(data: []const u8) Blake3Hash {
+    var hasher = std.crypto.hash.Blake3.init(.{});
+    hasher.update(data);
+    return hasher.finalResult();
+}
+
+/// Compute SHA3-256 hash of input data
+pub fn sha3_256(data: []const u8) Sha3_256Hash {
+    var hasher = std.crypto.hash.sha3.Sha3_256.init(.{});
+    hasher.update(data);
+    return hasher.finalResult();
+}
+
+/// Compute SHA3-512 hash of input data
+pub fn sha3_512(data: []const u8) Sha3_512Hash {
+    var hasher = std.crypto.hash.sha3.Sha3_512.init(.{});
+    hasher.update(data);
+    return hasher.finalResult();
 }
 
 /// HMAC-SHA256 computation
@@ -173,4 +203,37 @@ test "hmac blake2s" {
     const result = hmacBlake2s(message, key);
     
     try std.testing.expectEqual(@as(usize, 32), result.len);
+}
+
+test "blake3 basic" {
+    const input = "hello world";
+    const result = blake3(input);
+    
+    try std.testing.expectEqual(@as(usize, 32), result.len);
+    
+    // Should be deterministic
+    const result2 = blake3(input);
+    try std.testing.expectEqualSlices(u8, &result, &result2);
+}
+
+test "sha3-256 basic" {
+    const input = "hello world";
+    const result = sha3_256(input);
+    
+    try std.testing.expectEqual(@as(usize, 32), result.len);
+    
+    // Should be deterministic
+    const result2 = sha3_256(input);
+    try std.testing.expectEqualSlices(u8, &result, &result2);
+}
+
+test "sha3-512 basic" {
+    const input = "hello world";
+    const result = sha3_512(input);
+    
+    try std.testing.expectEqual(@as(usize, 64), result.len);
+    
+    // Should be deterministic
+    const result2 = sha3_512(input);
+    try std.testing.expectEqualSlices(u8, &result, &result2);
 }
