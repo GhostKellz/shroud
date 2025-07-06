@@ -44,7 +44,7 @@ pub const IdentityError = identity.IdentityError;
 pub const BridgeError = bridge.BridgeError;
 
 /// Library version
-pub const version = "0.2.0";
+pub const version = "0.3.0";
 
 /// Initialize a new wallet
 pub fn createWallet(allocator: std.mem.Allocator, passphrase: []const u8, mode: WalletMode) !Wallet {

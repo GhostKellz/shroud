@@ -29,7 +29,7 @@ pub const ShroudError = error{
 };
 
 pub fn version() []const u8 {
-    return "0.2.0";
+    return "0.3.0";
 }
 
 test "shroud module imports" {
