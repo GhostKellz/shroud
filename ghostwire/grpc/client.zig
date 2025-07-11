@@ -117,7 +117,7 @@ pub const ConnectionPool = struct {
             if (self.socket != null) return; // Already connected
 
             // Parse target (simplified)
-            var parts = std.mem.split(u8, self.target, ":");
+            var parts = std.mem.splitSequence(u8, self.target, ":");
             const host = parts.next() orelse return error.InvalidTarget;
             const port_str = parts.next() orelse "9090";
             const port = try std.fmt.parseInt(u16, port_str, 10);
@@ -167,12 +167,15 @@ pub const ConnectionPool = struct {
         defer self.mutex.unlock();
 
         // Find available connection
-        while (self.available.popOrNull()) |index| {
-            const conn = self.connections.items[index];
-            if (!conn.healthy) continue;
-            
-            conn.markUsed();
-            return conn;
+        for (self.available.items, 0..) |index, i| {
+            if (index < self.connections.items.len) {
+                const conn = self.connections.items[index];
+                if (conn.healthy) {
+                    conn.markUsed();
+                    _ = self.available.swapRemove(i);
+                    return conn;
+                }
+            }
         }
 
         // Create new connection if under limit
@@ -306,7 +309,7 @@ pub const GrpcClient = struct {
         defer self.pool.releaseConnection(conn);
 
         // Create gRPC message
-        const message = try GrpcMessage.init(self.allocator, grpc_call.request_data);
+        var message = try GrpcMessage.init(self.allocator, grpc_call.request_data);
         defer message.deinit();
 
         const encoded_message = try message.encode(self.allocator);

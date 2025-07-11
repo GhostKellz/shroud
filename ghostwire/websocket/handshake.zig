@@ -90,7 +90,7 @@ pub const WebSocketHandshake = struct {
 
     pub fn parseClientRequest(allocator: std.mem.Allocator, request: []const u8) !Self {
         var handshake = Self.init(allocator);
-        var lines = std.mem.split(u8, request, "\r\n");
+        var lines = std.mem.splitSequence(u8, request, "\r\n");
 
         // Skip request line
         _ = lines.next();
@@ -111,7 +111,7 @@ pub const WebSocketHandshake = struct {
             } else if (std.ascii.eqlIgnoreCase(header_name, "Sec-WebSocket-Extensions")) {
                 // Parse extensions (simplified)
                 var extensions = std.ArrayList([]const u8).init(allocator);
-                var ext_iter = std.mem.split(u8, header_value, ",");
+                var ext_iter = std.mem.splitSequence(u8, header_value, ",");
                 while (ext_iter.next()) |ext| {
                     const trimmed = std.mem.trim(u8, ext, " \t");
                     if (trimmed.len > 0) {
@@ -203,7 +203,7 @@ pub const WebSocketHandshake = struct {
     }
 
     pub fn parseServerResponse(allocator: std.mem.Allocator, response: []const u8, expected_key: []const u8) !bool {
-        var lines = std.mem.split(u8, response, "\r\n");
+        var lines = std.mem.splitSequence(u8, response, "\r\n");
 
         // Check status line
         const status_line = lines.next() orelse return error.InvalidResponse;
@@ -247,7 +247,7 @@ pub const WebSocketHandshake = struct {
     }
 
     pub fn isWebSocketRequest(request: []const u8) bool {
-        var lines = std.mem.split(u8, request, "\r\n");
+        var lines = std.mem.splitSequence(u8, request, "\r\n");
         
         // Check if it's an HTTP GET request
         const request_line = lines.next() orelse return false;

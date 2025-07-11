@@ -36,14 +36,18 @@ pub const HmacBlake3Hash = [32]u8;
 pub fn sha256(data: []const u8) Sha256Hash {
     var hasher = std.crypto.hash.sha2.Sha256.init(.{});
     hasher.update(data);
-    return hasher.finalResult();
+    var result: Sha256Hash = undefined;
+    hasher.final(&result);
+    return result;
 }
 
 /// Compute SHA-512 hash of input data
 pub fn sha512(data: []const u8) Sha512Hash {
     var hasher = std.crypto.hash.sha2.Sha512.init(.{});
     hasher.update(data);
-    return hasher.finalResult();
+    var result: Sha512Hash = undefined;
+    hasher.final(&result);
+    return result;
 }
 
 /// Compute Blake2b hash of input data
@@ -57,21 +61,27 @@ pub fn blake2b(data: []const u8) Blake2bHash {
 pub fn blake3(data: []const u8) Blake3Hash {
     var hasher = std.crypto.hash.Blake3.init(.{});
     hasher.update(data);
-    return hasher.finalResult();
+    var result: Blake3Hash = undefined;
+    hasher.final(&result);
+    return result;
 }
 
 /// Compute SHA3-256 hash of input data
 pub fn sha3_256(data: []const u8) Sha3_256Hash {
     var hasher = std.crypto.hash.sha3.Sha3_256.init(.{});
     hasher.update(data);
-    return hasher.finalResult();
+    var result: Sha3_256Hash = undefined;
+    hasher.final(&result);
+    return result;
 }
 
 /// Compute SHA3-512 hash of input data
 pub fn sha3_512(data: []const u8) Sha3_512Hash {
     var hasher = std.crypto.hash.sha3.Sha3_512.init(.{});
     hasher.update(data);
-    return hasher.finalResult();
+    var result: Sha3_512Hash = undefined;
+    hasher.final(&result);
+    return result;
 }
 
 /// HMAC-SHA256 computation
@@ -108,7 +118,9 @@ pub const Sha256 = struct {
     }
 
     pub fn final(self: *Sha256) Sha256Hash {
-        return self.hasher.finalResult();
+        var result: Sha256Hash = undefined;
+        self.hasher.final(&result);
+        return result;
     }
 };
 
@@ -125,7 +137,9 @@ pub const Sha512 = struct {
     }
 
     pub fn final(self: *Sha512) Sha512Hash {
-        return self.hasher.finalResult();
+        var result: Sha512Hash = undefined;
+        self.hasher.final(&result);
+        return result;
     }
 };
 

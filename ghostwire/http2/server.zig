@@ -264,7 +264,7 @@ pub const Http2Server = struct {
 
     pub fn start(self: *Self) !void {
         self.running = true;
-        std.log.info("HTTP/2 server listening on {}:{}", .{ self.config.address, self.config.port });
+        std.log.info("HTTP/2 server listening on {s}:{}", .{ self.config.address, self.config.port });
 
         while (self.running) {
             const client_connection = self.listener.accept() catch continue;
@@ -344,7 +344,7 @@ pub const Http2Server = struct {
 
         // Simplified header decoding (would need proper HPACK in production)
         const headers_text = frame.payload;
-        var lines = std.mem.split(u8, headers_text, "\n");
+        var lines = std.mem.splitSequence(u8, headers_text, "\n");
         
         while (lines.next()) |line| {
             if (std.mem.indexOf(u8, line, ":")) |colon_pos| {

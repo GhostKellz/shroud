@@ -134,11 +134,11 @@ pub const HttpRequest = struct {
     pub fn parse(allocator: std.mem.Allocator, data: []const u8) !Self {
         var request = Self.init(allocator);
         
-        var lines = std.mem.split(u8, data, "\r\n");
+        var lines = std.mem.splitSequence(u8, data, "\r\n");
         
         // Parse request line
         const request_line = lines.next() orelse return error.InvalidRequest;
-        var parts = std.mem.split(u8, request_line, " ");
+        var parts = std.mem.splitSequence(u8, request_line, " ");
         
         const method_str = parts.next() orelse return error.InvalidRequest;
         request.method = HttpMethod.fromString(method_str) orelse return error.InvalidMethod;

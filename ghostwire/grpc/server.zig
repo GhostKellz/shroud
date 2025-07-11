@@ -389,7 +389,7 @@ pub const GrpcServer = struct {
 
     pub fn start(self: *Self) !void {
         self.running = true;
-        std.log.info("gRPC server listening on {}:{}", .{ self.config.address, self.config.port });
+        std.log.info("gRPC server listening on {s}:{}", .{ self.config.address, self.config.port });
 
         switch (self.config.transport) {
             .http2 => {

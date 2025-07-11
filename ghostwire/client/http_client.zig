@@ -388,11 +388,11 @@ pub const HttpClient = struct {
     }
 
     fn parseHttp1Response(self: *Self, response_data: []const u8) !ClientResponse {
-        var lines = std.mem.split(u8, response_data, "\r\n");
+        var lines = std.mem.splitSequence(u8, response_data, "\r\n");
 
         // Parse status line
         const status_line = lines.next() orelse return error.InvalidResponse;
-        var status_parts = std.mem.split(u8, status_line, " ");
+        var status_parts = std.mem.splitSequence(u8, status_line, " ");
         
         _ = status_parts.next() orelse return error.InvalidResponse; // HTTP version
         const status_code_str = status_parts.next() orelse return error.InvalidResponse;

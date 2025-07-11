@@ -14,7 +14,7 @@ const utils = ghostcipher.utils;
 
 /// Ed25519 key sizes
 pub const ED25519_PUBLIC_KEY_SIZE = 32;
-pub const ED25519_PRIVATE_KEY_SIZE = 32;
+pub const ED25519_PRIVATE_KEY_SIZE = 64; // zcrypto uses 64-byte private keys
 pub const ED25519_SIGNATURE_SIZE = 64;
 
 /// Secp256k1 key sizes
@@ -38,7 +38,7 @@ pub const ZCRYPTO_ERROR_INTERNAL = -5;
 /// Returns: ZCRYPTO_SUCCESS on success, error code on failure
 pub export fn zcrypto_ed25519_keypair(
     public_key: [*]u8, // Must be at least 32 bytes
-    private_key: [*]u8, // Must be at least 32 bytes
+    private_key: [*]u8, // Must be at least 64 bytes
 ) callconv(.C) c_int {
     // Generate Ed25519 keypair using zcrypto
     const keypair = signatures.generateEd25519();
@@ -53,7 +53,7 @@ pub export fn zcrypto_ed25519_keypair(
 /// Sign message with Ed25519 private key
 /// Returns: ZCRYPTO_SUCCESS on success, error code on failure
 pub export fn zcrypto_ed25519_sign(
-    private_key: [*]const u8, // 32 bytes
+    private_key: [*]const u8, // 64 bytes
     message: [*]const u8, // Message to sign
     message_len: usize, // Message length
     signature: [*]u8, // Output signature (64 bytes)
@@ -115,7 +115,7 @@ pub export fn zcrypto_secp256k1_keypair(
 /// Sign hash with Secp256k1 private key
 /// Returns: ZCRYPTO_SUCCESS on success, error code on failure
 pub export fn zcrypto_secp256k1_sign(
-    private_key: [*]const u8, // 32 bytes
+    private_key: [*]const u8, // 64 bytes
     message_hash: [*]const u8, // 32-byte hash to sign
     signature: [*]u8, // Output signature (64 bytes: r + s)
 ) callconv(.C) c_int {
@@ -166,7 +166,8 @@ pub export fn zcrypto_blake3_hash(
     // Compute Blake3 hash using zcrypto
     var hasher = std.crypto.hash.Blake3.init(.{});
     hasher.update(input[0..input_len]);
-    const digest = hasher.finalResult();
+    var digest: [32]u8 = undefined;
+    hasher.final(&digest);
 
     // Copy hash to output buffer
     @memcpy(output[0..BLAKE3_HASH_SIZE], &digest);
@@ -184,7 +185,7 @@ pub export fn zcrypto_sha256_hash(
     // Compute SHA-256 hash using zcrypto
     var hasher = hash.Sha256.init();
     hasher.update(input[0..input_len]);
-    const digest = hasher.finalResult();
+    const digest = hasher.final();
 
     // Copy hash to output buffer
     @memcpy(output[0..SHA256_HASH_SIZE], &digest);
