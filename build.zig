@@ -243,6 +243,16 @@ pub fn build(b: *std.Build) void {
         bench_run_cmd.addArgs(args);
     }
 
+    // FFI Library builds for Rust integration
+    const ffi_step = b.step("ffi", "Build FFI libraries for Rust integration");
+
+    // Import the FFI build configuration
+    const build_ffi = @import("ghostwire/zquic/ffi/build_ffi.zig");
+    build_ffi.buildFfi(b, target, optimize);
+
+    // Make FFI depend on install step
+    ffi_step.dependOn(b.getInstallStep());
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

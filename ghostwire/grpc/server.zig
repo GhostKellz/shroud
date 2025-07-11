@@ -13,6 +13,10 @@ pub const GrpcConfig = struct {
     enable_reflection: bool = true,
     enable_health_check: bool = true,
     transport: Transport = .http2,
+    // FFI-compatible extensions
+    request_timeout_ms: u32 = 30000,
+    enable_discovery: bool = true,
+    enable_post_quantum: bool = true,
 };
 
 pub const Transport = enum {
@@ -269,12 +273,59 @@ pub const GrpcService = struct {
     }
 };
 
+// Service registration and discovery types
+pub const ServiceType = enum {
+    ghostd,
+    walletd,
+    edge_node,
+    other,
+};
+
+pub const HealthStatus = enum {
+    unknown,
+    healthy,
+    unhealthy,
+    maintenance,
+};
+
+pub const RegisteredService = struct {
+    name: []const u8,
+    endpoint: []const u8,
+    service_type: ServiceType,
+    health_status: HealthStatus,
+    last_health_check: i64,
+    
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, endpoint: []const u8, service_type: ServiceType) !RegisteredService {
+        return RegisteredService{
+            .name = try allocator.dupe(u8, name),
+            .endpoint = try allocator.dupe(u8, endpoint),
+            .service_type = service_type,
+            .health_status = .unknown,
+            .last_health_check = std.time.timestamp(),
+        };
+    }
+    
+    pub fn deinit(self: *RegisteredService, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.endpoint);
+    }
+};
+
+pub const ServerStats = struct {
+    total_connections: u64 = 0,
+    active_connections: u32 = 0,
+    requests_handled: u64 = 0,
+    errors: u64 = 0,
+};
+
 pub const GrpcServer = struct {
     allocator: std.mem.Allocator,
     config: GrpcConfig,
     services: std.StringHashMap(*GrpcService),
+    registered_services: std.StringHashMap(RegisteredService),
     http2_server: ?Http2Server = null,
     running: bool = false,
+    stats: ServerStats = .{},
 
     const Self = @This();
 
@@ -283,6 +334,7 @@ pub const GrpcServer = struct {
             .allocator = allocator,
             .config = config,
             .services = std.StringHashMap(*GrpcService).init(allocator),
+            .registered_services = std.StringHashMap(RegisteredService).init(allocator),
         };
 
         // Initialize HTTP/2 transport
@@ -317,6 +369,13 @@ pub const GrpcServer = struct {
             self.allocator.free(entry.key_ptr.*);
         }
         self.services.deinit();
+        
+        var reg_iterator = self.registered_services.iterator();
+        while (reg_iterator.next()) |entry| {
+            entry.value_ptr.deinit(self.allocator);
+            self.allocator.free(entry.key_ptr.*);
+        }
+        self.registered_services.deinit();
 
         if (self.http2_server) |*server| {
             server.deinit();
@@ -418,6 +477,153 @@ pub const GrpcServer = struct {
         }
         
         return null;
+    }
+    
+    // FFI-compatible methods
+    pub fn registerService(self: *Self, name: []const u8, endpoint: []const u8, service_type: ServiceType) !void {
+        const registered_service = try RegisteredService.init(self.allocator, name, endpoint, service_type);
+        const owned_name = try self.allocator.dupe(u8, name);
+        try self.registered_services.put(owned_name, registered_service);
+    }
+    
+    pub fn unregisterService(self: *Self, name: []const u8) !void {
+        if (self.registered_services.fetchRemove(name)) |kv| {
+            var value = kv.value;
+            value.deinit(self.allocator);
+            self.allocator.free(kv.key);
+        }
+    }
+    
+    pub fn createConnection(self: *Self, service_name: []const u8) !*GrpcConnection {
+        _ = service_name;
+        // Create a new connection - this would typically create a client connection
+        const connection = try self.allocator.create(GrpcConnection);
+        connection.* = GrpcConnection{
+            .connection_id = @intCast(std.time.microTimestamp()),
+            .allocator = self.allocator,
+        };
+        return connection;
+    }
+    
+    pub fn getServices(self: *Self) []RegisteredService {
+        var services = self.allocator.alloc(RegisteredService, self.registered_services.count()) catch return &[_]RegisteredService{};
+        var i: usize = 0;
+        var iterator = self.registered_services.iterator();
+        while (iterator.next()) |entry| {
+            services[i] = entry.value_ptr.*;
+            i += 1;
+        }
+        return services;
+    }
+    
+    pub fn checkServiceHealth(self: *Self, service_name: []const u8) HealthStatus {
+        if (self.registered_services.get(service_name)) |service| {
+            return service.health_status;
+        }
+        return .unknown;
+    }
+    
+    pub fn updateStats(self: *Self) void {
+        // Update statistics - would typically collect from actual connections
+        self.stats.total_connections += 1;
+    }
+};
+
+// Connection type for FFI compatibility
+pub const GrpcConnection = struct {
+    connection_id: u64,
+    allocator: std.mem.Allocator,
+    
+    pub fn sendUnaryRequest(self: *GrpcConnection, method: GrpcMethod, request_data: []const u8) !GrpcResponseInternal {
+        _ = method;
+        _ = request_data;
+        // Mock implementation - would send actual request
+        return GrpcResponseInternal{
+            .body = try self.allocator.dupe(u8, "mock response"),
+            .status_code = 0,
+            .status_message = try self.allocator.dupe(u8, "OK"),
+            .response_id = self.connection_id,
+        };
+    }
+    
+    pub fn createStream(self: *GrpcConnection, method: GrpcMethod) !*GrpcStream {
+        _ = method;
+        const stream = try self.allocator.create(GrpcStream);
+        stream.* = GrpcStream{
+            .stream_id = @intCast(std.time.microTimestamp()),
+            .allocator = self.allocator,
+        };
+        return stream;
+    }
+};
+
+// Method type for FFI compatibility
+pub const GrpcMethod = struct {
+    service: []const u8,
+    method: []const u8,
+    allocator: std.mem.Allocator,
+    
+    pub fn init(allocator: std.mem.Allocator, service: []const u8, method: []const u8) !GrpcMethod {
+        return GrpcMethod{
+            .service = try allocator.dupe(u8, service),
+            .method = try allocator.dupe(u8, method),
+            .allocator = allocator,
+        };
+    }
+    
+    pub fn deinit(self: GrpcMethod, allocator: std.mem.Allocator) void {
+        allocator.free(self.service);
+        allocator.free(self.method);
+    }
+};
+
+// Response type for FFI compatibility
+pub const GrpcResponseInternal = struct {
+    body: []const u8,
+    status_code: u32,
+    status_message: []const u8,
+    response_id: u64,
+};
+
+// Stream type for FFI compatibility
+pub const GrpcStream = struct {
+    stream_id: u64,
+    allocator: std.mem.Allocator,
+    
+    pub const MessageType = enum {
+        stream_data,
+        stream_end,
+    };
+    
+    pub const StreamMessage = struct {
+        message_type: MessageType,
+        data: []const u8,
+        allocator: std.mem.Allocator,
+        
+        pub fn deinit(self: *StreamMessage, allocator: std.mem.Allocator) void {
+            allocator.free(self.data);
+        }
+    };
+    
+    pub fn sendMessage(self: *GrpcStream, message_type: MessageType, data: []const u8) !void {
+        _ = self;
+        _ = message_type;
+        _ = data;
+        // Mock implementation
+    }
+    
+    pub fn receiveMessage(self: *GrpcStream) !StreamMessage {
+        // Mock implementation
+        return StreamMessage{
+            .message_type = .stream_data,
+            .data = try self.allocator.dupe(u8, "mock stream data"),
+            .allocator = self.allocator,
+        };
+    }
+    
+    pub fn close(self: *GrpcStream) !void {
+        _ = self;
+        // Mock implementation
     }
 };
 

@@ -24,13 +24,13 @@
 
 **Option A: Git Submodule (Recommended)**
 ```bash
-git submodule add https://github.com/your-org/shroud.git deps/shroud
+git submodule add https://github.com/ghostkellz/shroud.git deps/shroud
 git submodule update --init --recursive
 ```
 
 **Option B: Clone Directly**
 ```bash
-git clone https://github.com/your-org/shroud.git deps/shroud
+git clone https://github.com/ghostkellz/shroud.git deps/shroud
 ```
 
 ### 2. Update Your build.zig

@@ -4,15 +4,15 @@
 //! Now with real implementation using production gRPC-over-QUIC
 
 const std = @import("std");
-const zquic = @import("../root.zig");
-const GhostBridge = @import("../services/ghostbridge.zig").GhostBridge;
-const GhostBridgeConfig = @import("../services/ghostbridge.zig").GhostBridgeConfig;
-const GrpcConnection = @import("../services/ghostbridge.zig").GrpcConnection;
-const GrpcStream = @import("../services/ghostbridge.zig").GrpcStream;
-const GrpcMethod = @import("../services/ghostbridge.zig").GrpcMethod;
-const GrpcRequestInternal = @import("../services/ghostbridge.zig").GrpcRequest;
-const GrpcResponseInternal = @import("../services/ghostbridge.zig").GrpcResponse;
-const ServiceRegistration = @import("../services/ghostbridge.zig").ServiceRegistration;
+const ghostwire = @import("ghostwire");
+const GhostBridge = ghostwire.grpc.GrpcServer;
+const GhostBridgeConfig = ghostwire.grpc.server.GrpcConfig;
+const GrpcConnection = ghostwire.grpc.GrpcClient;
+const GrpcStream = ghostwire.grpc.GrpcMessage;
+const GrpcMethod = ghostwire.grpc.GrpcStatus;
+const GrpcRequestInternal = ghostwire.grpc.GrpcMessage;
+const GrpcResponseInternal = ghostwire.grpc.GrpcMessage;
+const ServiceRegistration = ghostwire.grpc.server.EchoService;
 
 // Global allocator for FFI - in production, this should be configurable
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};

@@ -267,10 +267,10 @@ pub const Http2Server = struct {
         std.log.info("HTTP/2 server listening on {}:{}", .{ self.config.address, self.config.port });
 
         while (self.running) {
-            const client_socket = self.listener.accept() catch continue;
+            const client_connection = self.listener.accept() catch continue;
             
             // Handle connection in a separate thread (simplified for demo)
-            try self.handleConnection(client_socket);
+            try self.handleConnection(client_connection.stream);
         }
     }
 

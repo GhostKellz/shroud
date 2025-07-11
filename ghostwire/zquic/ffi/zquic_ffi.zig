@@ -5,14 +5,14 @@
 //! and standard C types for maximum compatibility.
 
 const std = @import("std");
-const zquic = @import("zquic");
+const ghostwire = @import("ghostwire");
 
 /// Import core QUIC modules for actual implementation
-const QuicConnection = zquic.Connection.Connection;
-const QuicStream = zquic.Stream.Stream;
-const QuicPacket = zquic.Packet;
-const QuicFlowControl = zquic.FlowControl;
-const QuicError = zquic.Error;
+const QuicConnection = ghostwire.zquic.Connection.Connection;
+const QuicStream = ghostwire.zquic.Stream.Stream;
+const QuicPacket = ghostwire.zquic.Packet;
+const QuicFlowControl = ghostwire.zquic.FlowControl;
+const QuicError = ghostwire.zquic.Error;
 
 /// Local error types for FFI layer
 const ZQuicError = error{
@@ -66,7 +66,7 @@ pub const ZQuicConnectionInfo = extern struct {
 const Context = struct {
     allocator: std.mem.Allocator,
     config: ZQuicConfig,
-    server: ?*zquic.Http3.Http3Server,
+    server: ?*ghostwire.zquic.Http3.Http3Server,
     connections: std.ArrayList(*Connection),
     flow_controller: ?*QuicFlowControl.FlowController,
 
@@ -137,7 +137,7 @@ const Connection = struct {
             stream.deinit();
         }
         self.streams.deinit();
-        self.connection.deinit();
+        self.connection.*.deinit();
         self.allocator.destroy(self);
     }
 
@@ -180,7 +180,7 @@ const Stream = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.stream.deinit();
+        self.stream.*.deinit();
         self.allocator.destroy(self);
     }
 };
@@ -216,13 +216,13 @@ pub export fn zquic_create_server(ctx: ?*ZQuicContext) callconv(.C) c_int {
 
     if (context.server != null) return -1; // Server already exists
 
-    const server_config = zquic.Http3.ServerConfig{
+    const server_config = ghostwire.zquic.Http3.ServerConfig{
         .max_connections = context.config.max_connections,
         .request_timeout_ms = context.config.connection_timeout_ms,
     };
 
-    const server = context.allocator.create(zquic.Http3.Http3Server) catch return -1;
-    server.* = zquic.Http3.Http3Server.init(context.allocator, server_config) catch {
+    const server = context.allocator.create(ghostwire.zquic.Http3.Http3Server) catch return -1;
+    server.* = ghostwire.zquic.Http3.Http3Server.init(context.allocator, server_config) catch {
         context.allocator.destroy(server);
         return -1;
     };
@@ -311,7 +311,7 @@ pub export fn zquic_send_data(conn: ?*ZQuicConnection, data: [*]const u8, len: u
     if (len == 0) return 0;
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         std.log.warn("Attempted to send data on non-established connection", .{});
         return -1;
     }
@@ -320,7 +320,7 @@ pub export fn zquic_send_data(conn: ?*ZQuicConnection, data: [*]const u8, len: u
     var stream: *Stream = undefined;
     if (connection.streams.items.len == 0) {
         // Create default bidirectional stream
-        const quic_stream = connection.connection.createStream(.client_bidirectional) catch |err| {
+        const quic_stream = connection.connection.*.createStream(.client_bidirectional) catch |err| {
             std.log.err("Failed to create stream: {}", .{err});
             return -1;
         };
@@ -355,7 +355,7 @@ pub export fn zquic_receive_data(conn: ?*ZQuicConnection, buffer: [*]u8, max_len
     if (max_len == 0) return 0;
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         return 0; // No data on non-established connection
     }
 
@@ -383,15 +383,15 @@ pub export fn zquic_create_stream(conn: ?*ZQuicConnection, stream_type: u8) call
     const connection: *Connection = @ptrCast(@alignCast(conn orelse return null));
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         std.log.warn("Attempted to create stream on non-established connection", .{});
         return null;
     }
 
     // Determine stream type
-    const quic_stream_type: zquic.Stream.StreamType = switch (stream_type) {
-        0 => if (connection.connection.role == .client) .client_bidirectional else .server_bidirectional,
-        1 => if (connection.connection.role == .client) .client_unidirectional else .server_unidirectional,
+    const quic_stream_type: ghostwire.zquic.Stream.StreamType = switch (stream_type) {
+        0 => if (connection.connection.*.role == .client) .client_bidirectional else .server_bidirectional,
+        1 => if (connection.connection.*.role == .client) .client_unidirectional else .server_unidirectional,
         else => {
             std.log.err("Invalid stream type: {}", .{stream_type});
             return null;
@@ -399,7 +399,7 @@ pub export fn zquic_create_stream(conn: ?*ZQuicConnection, stream_type: u8) call
     };
 
     // Create QUIC stream
-    const quic_stream = connection.connection.createStream(quic_stream_type) catch |err| {
+    const quic_stream = connection.connection.*.createStream(quic_stream_type) catch |err| {
         std.log.err("Failed to create QUIC stream: {}", .{err});
         return null;
     };
@@ -434,7 +434,7 @@ pub export fn zquic_stream_send(stream: ?*ZQuicStream, data: [*]const u8, len: u
     const data_slice = data[0..len];
 
     // Write data to the stream
-    const bytes_written = s.stream.write(data_slice, false) catch |err| {
+    const bytes_written = s.stream.*.write(data_slice, false) catch |err| {
         std.log.err("Failed to write to stream {}: {}", .{ s.stream_id, err });
         return -1;
     };
@@ -453,7 +453,7 @@ pub export fn zquic_stream_receive(stream: ?*ZQuicStream, buffer: [*]u8, max_len
     const buffer_slice = buffer[0..max_len];
 
     // Read data from the stream
-    const bytes_read = s.stream.read(buffer_slice);
+    const bytes_read = s.stream.*.read(buffer_slice);
 
     return @intCast(bytes_read);
 }
@@ -524,7 +524,7 @@ pub export fn zquic_grpc_call(conn: ?*ZQuicConnection, service_method: [*:0]cons
     const request_slice = request_data[0..request_len];
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         std.log.warn("gRPC call attempted on non-established connection", .{});
         return null;
     }
@@ -544,7 +544,7 @@ pub export fn zquic_grpc_call(conn: ?*ZQuicConnection, service_method: [*:0]cons
 
     if (!found_stream) {
         // Create new bidirectional stream for gRPC
-        const quic_stream = connection.connection.createStream(.client_bidirectional) catch |err| {
+        const quic_stream = connection.connection.*.createStream(.client_bidirectional) catch |err| {
             std.log.err("Failed to create gRPC stream: {}", .{err});
             return null;
         };
@@ -754,7 +754,7 @@ pub export fn zquic_proxy_route(proxy: ?*anyopaque, conn: ?*ZQuicConnection) cal
     const connection: *Connection = @ptrCast(@alignCast(conn orelse return -1));
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         std.log.warn("Attempted to route non-established connection", .{});
         return -1;
     }
@@ -820,7 +820,7 @@ pub export fn zquic_dns_query(conn: ?*ZQuicConnection, domain: [*:0]const u8, qu
     const domain_str = std.mem.span(domain);
 
     // Check if connection is established
-    if (!connection.connection.isEstablished()) {
+    if (connection.connection.*.state != .established) {
         std.log.warn("DNS query attempted on non-established connection", .{});
         response.rcode = 2; // SERVFAIL
         return -1;
@@ -845,7 +845,7 @@ pub export fn zquic_dns_query(conn: ?*ZQuicConnection, domain: [*:0]const u8, qu
 
     if (!found_stream) {
         // Create new unidirectional stream for DNS query
-        const quic_stream = connection.connection.createStream(.client_unidirectional) catch |err| {
+        const quic_stream = connection.connection.*.createStream(.client_unidirectional) catch |err| {
             std.log.err("Failed to create DNS stream: {}", .{err});
             response.rcode = 2; // SERVFAIL
             return -1;

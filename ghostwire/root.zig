@@ -35,6 +35,14 @@ pub const grpc = struct {
     pub const GrpcMessage = server.GrpcMessage;
     pub const GrpcStatus = server.GrpcStatus;
     pub const EchoService = server.EchoService;
+    pub const GrpcConnection = server.GrpcConnection;
+    pub const GrpcMethod = server.GrpcMethod;
+    pub const GrpcResponseInternal = server.GrpcResponseInternal;
+    pub const GrpcStream = server.GrpcStream;
+    pub const ServiceType = server.ServiceType;
+    pub const HealthStatus = server.HealthStatus;
+    pub const RegisteredService = server.RegisteredService;
+    pub const GrpcConfig = server.GrpcConfig;
 };
 
 // IPv6 networking stack
