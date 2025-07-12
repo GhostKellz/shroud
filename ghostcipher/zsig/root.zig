@@ -4,7 +4,11 @@
 const zsig = @import("zsig.zig");
 
 // Re-export everything from zsig module
-pub usingnamespace zsig;
+pub const ZsigSigner = zsig.ZsigSigner;
+pub const ZsigVerifier = zsig.ZsigVerifier;
+pub const ZsigKeyPair = zsig.ZsigKeyPair;
+pub const ZsigSignature = zsig.ZsigSignature;
+pub const ZsigError = zsig.ZsigError;
 
 // Include tests from zsig module
 test {

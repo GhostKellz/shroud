@@ -1,6 +1,26 @@
 //! Ghostwire: Complete networking stack for Shroud v1.0
 //! QUIC, HTTP/1.1, HTTP/2, HTTP/3, gRPC, IPv6, WebSockets, Reverse Proxy
+//! Now with async support for massive performance improvements
 const std = @import("std");
+
+// Async core - Local async implementation
+pub const async_local = @import("async_local.zig");
+pub const async_core = @import("async_core.zig");
+pub const async_server = @import("async_unified_server.zig");
+
+// Async types and components
+pub const AsyncRuntime = async_local.AsyncRuntime;
+pub const AsyncServerCore = async_core.AsyncServerCore;
+pub const AsyncUnifiedServer = async_server.AsyncUnifiedServer;
+pub const AsyncServerBuilder = async_server.AsyncServerBuilder;
+pub const AsyncHttpRequest = async_server.AsyncHttpRequest;
+pub const AsyncHttpResponse = async_server.AsyncHttpResponse;
+pub const AsyncRequestHandler = async_server.AsyncRequestHandler;
+pub const AsyncMiddleware = async_server.AsyncMiddleware;
+
+// Async connections
+pub const AsyncConnection = async_local.AsyncConnection;
+pub const AsyncHttpConnection = async_core.AsyncHttpConnection;
 
 // Core protocol implementations
 pub const zquic = @import("zquic/root.zig");
@@ -14,7 +34,7 @@ pub const websocket = struct {
     pub const client = @import("websocket/client.zig");
     pub const frame = @import("websocket/frame.zig");
     pub const handshake = @import("websocket/handshake.zig");
-    
+
     // Convenience exports
     pub const WebSocketServer = server.WebSocketServer;
     pub const WebSocketClient = client.WebSocketClient;
@@ -28,7 +48,7 @@ pub const websocket = struct {
 pub const grpc = struct {
     pub const server = @import("grpc/server.zig");
     pub const grpc_client = @import("grpc/client.zig");
-    
+
     // Convenience exports
     pub const GrpcServer = server.GrpcServer;
     pub const GrpcClient = grpc_client.GrpcClient;
@@ -49,7 +69,7 @@ pub const grpc = struct {
 pub const ipv6 = struct {
     pub const core = @import("ipv6/core.zig");
     pub const discovery = @import("ipv6/discovery.zig");
-    
+
     // Convenience exports
     pub const IPv6Address = core.IPv6Address;
     pub const IPv6Subnet = core.IPv6Subnet;
@@ -145,6 +165,14 @@ pub fn createWebSocketServer(allocator: std.mem.Allocator, config: websocket.ser
 
 pub fn createWebSocketClient(allocator: std.mem.Allocator, url: []const u8, config: websocket.client.WebSocketClientConfig) !websocket.WebSocketClient {
     return websocket.WebSocketClient.init(allocator, url, config);
+}
+
+pub fn createAsyncUnifiedServer(allocator: std.mem.Allocator, runtime: *AsyncRuntime, config: async_server.AsyncUnifiedServerConfig) !*AsyncUnifiedServer {
+    return AsyncUnifiedServer.init(allocator, runtime, config);
+}
+
+pub fn createAsyncServerBuilder(allocator: std.mem.Allocator, runtime: *AsyncRuntime) AsyncServerBuilder {
+    return AsyncServerBuilder.init(allocator, runtime);
 }
 
 test "ghostwire tests" {

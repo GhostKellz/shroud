@@ -159,12 +159,12 @@ pub const Wallet = struct {
     pub fn fromMnemonic(allocator: std.mem.Allocator, mnemonic: []const u8, password: ?[]const u8, mode: WalletMode) !Self {
         // In a real implementation, this would derive keys from mnemonic
         // For now, use the mnemonic as passphrase (with optional password)
-        const passphrase = if (password) |pwd| 
-            try std.fmt.allocPrint(allocator, "{s}:{s}", .{mnemonic, pwd})
-        else 
+        const passphrase = if (password) |pwd|
+            try std.fmt.allocPrint(allocator, "{s}:{s}", .{ mnemonic, pwd })
+        else
             try allocator.dupe(u8, mnemonic);
         defer allocator.free(passphrase);
-        
+
         return Self.create(allocator, passphrase, mode, "imported_wallet");
     }
 
@@ -233,7 +233,7 @@ pub const Wallet = struct {
             },
             .stellar, .hedera => {
                 // Use public key directly for these protocols
-                const pubkey_hex = try std.fmt.allocPrint(self.allocator, "{}", .{std.fmt.fmtSliceHexLower(&identity.public_key.bytes)});
+                const pubkey_hex = try std.fmt.allocPrint(self.allocator, "{x}", .{identity.public_key.bytes});
                 return pubkey_hex;
             },
         }
@@ -328,7 +328,7 @@ pub const Wallet = struct {
 
         // Take last 20 bytes and format as hex with 0x prefix
         const addr_bytes = hash[12..32];
-        return try std.fmt.allocPrint(self.allocator, "0x{}", .{std.fmt.fmtSliceHexLower(addr_bytes)});
+        return try std.fmt.allocPrint(self.allocator, "0x{x}", .{addr_bytes});
     }
 
     /// Derive Bitcoin address from public key
@@ -340,7 +340,7 @@ pub const Wallet = struct {
         var hash: [32]u8 = undefined;
         hasher.final(&hash);
 
-        return try std.fmt.allocPrint(self.allocator, "bc1q{}", .{std.fmt.fmtSliceHexLower(hash[0..20])});
+        return try std.fmt.allocPrint(self.allocator, "bc1q{x}", .{hash[0..20]});
     }
 
     pub fn deinit(self: *Self) void {

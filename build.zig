@@ -22,12 +22,15 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
+    // Get TokioZ async runtime dependency
+    const tokioz = b.dependency("tokioZ", .{});
+
     // Shroud v1.0 modular architecture - core modules
     const ghostcipher_mod = b.addModule("ghostcipher", .{
         .root_source_file = b.path("ghostcipher/root.zig"),
         .target = target,
     });
-    
+
     const sigil_mod = b.addModule("sigil", .{
         .root_source_file = b.path("sigil/root.zig"),
         .target = target,
@@ -35,43 +38,56 @@ pub fn build(b: *std.Build) void {
             .{ .name = "ghostcipher", .module = ghostcipher_mod },
         },
     });
-    
+
     const zns_mod = b.addModule("zns", .{
         .root_source_file = b.path("zns/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+        },
     });
-    
+
     const ghostwire_mod = b.addModule("ghostwire", .{
         .root_source_file = b.path("ghostwire/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+        },
     });
-    
+
     const keystone_mod = b.addModule("keystone", .{
         .root_source_file = b.path("keystone/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+        },
     });
-    
+
     const guardian_mod = b.addModule("guardian", .{
         .root_source_file = b.path("guardian/root.zig"),
         .target = target,
     });
-    
+
     const covenant_mod = b.addModule("covenant", .{
         .root_source_file = b.path("covenant/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+        },
     });
-    
+
     const shadowcraft_mod = b.addModule("shadowcraft", .{
         .root_source_file = b.path("shadowcraft/root.zig"),
         .target = target,
     });
-    
+
     const gwallet_mod = b.addModule("gwallet", .{
         .root_source_file = b.path("gwallet/src/root.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "sigil", .module = sigil_mod },
             .{ .name = "ghostcipher", .module = ghostcipher_mod },
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
         },
     });
 
@@ -89,6 +105,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "covenant", .module = covenant_mod },
             .{ .name = "shadowcraft", .module = shadowcraft_mod },
             .{ .name = "gwallet", .module = gwallet_mod },
+            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
         },
     });
 
