@@ -185,18 +185,39 @@ const Stream = struct {
     }
 };
 
-// Global allocator for FFI operations (will be set by init)
-var global_allocator: std.mem.Allocator = undefined;
-var allocator_initialized: bool = false;
+// Thread-local allocator state with proper cleanup
+threadlocal var gpa_instance: ?std.heap.GeneralPurposeAllocator(.{}) = null;
+threadlocal var allocator_initialized: bool = false;
+
+fn getGlobalAllocator() std.mem.Allocator {
+    if (gpa_instance == null) {
+        gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
+    }
+    return gpa_instance.?.allocator();
+}
+
+/// Cleanup allocator resources - must be called before library unload
+pub export fn zquic_cleanup_allocator() callconv(.C) void {
+    if (gpa_instance) |*gpa| {
+        const leaked = gpa.detectLeaks();
+        if (leaked) {
+            std.log.warn("Memory leaks detected in ZQUIC FFI", .{});
+        }
+        _ = gpa.deinit();
+        gpa_instance = null;
+        allocator_initialized = false;
+        std.log.info("ZQUIC allocator cleaned up", .{});
+    }
+}
 
 /// Initialize ZQUIC context with configuration
 /// Returns: Opaque context pointer or null on failure
 pub export fn zquic_init(config: *const ZQuicConfig) callconv(.C) ?*ZQuicContext {
     if (!allocator_initialized) {
-        global_allocator = std.heap.c_allocator;
         allocator_initialized = true;
     }
 
+    const global_allocator = getGlobalAllocator();
     const ctx = Context.init(global_allocator, config.*) catch return null;
     return @ptrCast(ctx);
 }
@@ -635,6 +656,7 @@ pub export fn zquic_grpc_call(conn: ?*ZQuicConnection, service_method: [*:0]cons
 /// Free gRPC response allocated by zquic_grpc_call
 pub export fn zquic_grpc_response_free(response: ?*ZQuicGrpcResponse) callconv(.C) void {
     if (response) |resp| {
+        const global_allocator = getGlobalAllocator();
         if (resp.len > 0) {
             // Free the response data using global allocator
             global_allocator.free(resp.data[0..resp.len]);

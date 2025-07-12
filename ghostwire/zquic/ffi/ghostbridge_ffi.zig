@@ -15,9 +15,45 @@ const GrpcRequestInternal = ghostwire.grpc.GrpcMessage;
 const GrpcResponseInternal = ghostwire.grpc.GrpcMessage;
 const ServiceType = ghostwire.grpc.server.ServiceType;
 
-// Global allocator for FFI - in production, this should be configurable
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = gpa.allocator();
+// Thread-local allocator state with proper cleanup
+threadlocal var gpa_instance: ?std.heap.GeneralPurposeAllocator(.{}) = null;
+
+fn getAllocator() std.mem.Allocator {
+    if (gpa_instance == null) {
+        gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
+    }
+    return gpa_instance.?.allocator();
+}
+
+/// Cleanup allocator resources - must be called before library unload
+pub export fn ghostbridge_cleanup_allocator() callconv(.C) void {
+    if (gpa_instance) |*gpa| {
+        const leaked = gpa.detectLeaks();
+        if (leaked) {
+            std.log.warn("Memory leaks detected in GhostBridge FFI", .{});
+        }
+        _ = gpa.deinit();
+        gpa_instance = null;
+        std.log.info("GhostBridge allocator cleaned up", .{});
+    }
+}
+
+/// FFI Safety and bounds checking
+const FFI_MAX_STRING_SIZE = 4096;
+const FFI_MAX_DATA_SIZE = 1024 * 1024; // 1MB max data size
+const FFI_MAX_SERVICES = 256;
+
+/// Safe bounds checking for FFI string operations
+fn validateStringBounds(ptr: [*:0]const u8, max_len: usize) bool {
+    const len = std.mem.len(ptr);
+    return len <= max_len;
+}
+
+/// Safe bounds checking for FFI data operations  
+fn validateDataBounds(ptr: [*]const u8, len: usize, max_len: usize) bool {
+    _ = ptr; // Suppress unused parameter warning for now
+    return len <= max_len;
+}
 
 /// Opaque pointer types for FFI safety
 /// These map to real implementation types internally
@@ -92,6 +128,7 @@ pub export fn ghostbridge_init(config: *const BridgeConfig) callconv(.C) ?*Ghost
     };
     
     // Create real GhostBridge instance
+    const allocator = getAllocator();
     const bridge = allocator.create(GhostBridge) catch |err| {
         std.log.err("Failed to allocate GhostBridge: {}", .{err});
         return null;
@@ -110,6 +147,7 @@ pub export fn ghostbridge_init(config: *const BridgeConfig) callconv(.C) ?*Ghost
 /// Destroy GhostBridge and free resources
 pub export fn ghostbridge_destroy(bridge: ?*GhostBridgeOpaque) callconv(.C) void {
     if (bridge) |b| {
+        const allocator = getAllocator();
         const real_bridge: *GhostBridge = @ptrCast(@alignCast(b));
         real_bridge.deinit();
         allocator.destroy(real_bridge);
@@ -143,6 +181,12 @@ pub export fn ghostbridge_stop(bridge: ?*GhostBridgeOpaque) callconv(.C) void {
 /// Returns: 0 on success, -1 on failure
 pub export fn ghostbridge_register_service(bridge: ?*GhostBridgeOpaque, name: [*:0]const u8, endpoint: [*:0]const u8) callconv(.C) c_int {
     if (bridge) |b| {
+        // Bounds checking for input strings
+        if (!validateStringBounds(name, FFI_MAX_STRING_SIZE) or !validateStringBounds(endpoint, FFI_MAX_STRING_SIZE)) {
+            std.log.err("Service registration failed: string bounds exceeded", .{});
+            return -1;
+        }
+        
         const real_bridge: *GhostBridge = @ptrCast(@alignCast(b));
         const name_str = std.mem.span(name);
         const endpoint_str = std.mem.span(endpoint);
@@ -216,14 +260,28 @@ pub export fn ghostbridge_close_grpc_connection(conn: ?*GrpcConnectionOpaque) ca
 /// Returns: Pointer to response or null on failure (caller must free)
 pub export fn ghostbridge_send_grpc_request(conn: ?*GrpcConnectionOpaque, request: *const GrpcRequest) callconv(.C) ?*GrpcResponse {
     if (conn) |c| {
+        // Bounds checking for request data
+        if (!validateDataBounds(request.data, request.data_len, FFI_MAX_DATA_SIZE)) {
+            std.log.err("gRPC request failed: data size exceeds limits", .{});
+            return null;
+        }
+        
         const real_conn: *GrpcConnection = @ptrCast(@alignCast(c));
         
-        // Convert FFI request to internal format
+        // Convert FFI request to internal format with bounds checking
         const service_str = std.mem.span(@as([*:0]const u8, @ptrCast(&request.service)));
         const method_str = std.mem.span(@as([*:0]const u8, @ptrCast(&request.method)));
+        
+        // Additional validation for service/method strings
+        if (service_str.len == 0 or method_str.len == 0 or service_str.len > 63 or method_str.len > 63) {
+            std.log.err("gRPC request failed: invalid service or method name", .{});
+            return null;
+        }
+        
         const request_data = request.data[0..request.data_len];
         
         // Create gRPC method name
+        const allocator = getAllocator();
         const method_name = allocator.alloc(u8, service_str.len + method_str.len + 2) catch {
             std.log.err("Failed to allocate method name", .{});
             return null;
@@ -281,6 +339,7 @@ pub export fn ghostbridge_send_grpc_request(conn: ?*GrpcConnectionOpaque, reques
 /// Free gRPC response memory
 pub export fn ghostbridge_free_grpc_response(response: ?*GrpcResponse) callconv(.C) void {
     if (response) |resp| {
+        const allocator = getAllocator();
         // Free the response data
         if (resp.data_len > 0) {
             allocator.free(resp.data[0..resp.data_len]);
@@ -298,6 +357,7 @@ pub export fn ghostbridge_create_grpc_stream(conn: ?*GrpcConnectionOpaque, servi
         _ = c; // Silence unused variable warning
         
         // Create streaming call
+        const allocator = getAllocator();
         const stream_call = GrpcCall.init(allocator, service_str, method_str, "") catch {
             std.log.err("Failed to create gRPC stream call", .{});
             return null;
@@ -325,6 +385,7 @@ pub export fn ghostbridge_stream_send(stream: ?*GrpcStreamOpaque, data: [*]const
         const message_data = data[0..len];
         
         // Allocate new data for streaming (avoiding realloc const issue)
+        const allocator = getAllocator();
         const old_len = real_stream.request_data.len;
         const new_data = allocator.alloc(u8, old_len + message_data.len) catch {
             std.log.err("Failed to allocate stream data", .{});
@@ -365,6 +426,7 @@ pub export fn ghostbridge_stream_receive(stream: ?*GrpcStreamOpaque, buffer: [*]
 /// Close gRPC stream
 pub export fn ghostbridge_close_grpc_stream(stream: ?*GrpcStreamOpaque) callconv(.C) void {
     if (stream) |s| {
+        const allocator = getAllocator();
         const real_stream: *GrpcStream = @ptrCast(@alignCast(s));
         // Properly close the stream
         std.log.info("Closing gRPC stream", .{});

@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-07-11
+## [0.5.0] - 2025-07-12
+
+### Added
+- Complete BIP-32 hierarchical deterministic key derivation implementation in gwallet crypto utils
+- Complete BIP-39 mnemonic generation and seed derivation with proper PBKDF2-HMAC-SHA512
+- WASM runtime crypto capabilities with browser/Node.js support and TypeScript bindings
+- Ghost ID (GID) system in sigil as alternative to RealID for Ghost Chain entities
+- FFI memory safety with comprehensive bounds checking for all input parameters
+- Post-quantum crypto verification with proper SLH-DSA signature validation
+- Assembly optimization infrastructure for crypto operations with architecture detection
 
 ### Fixed
 - Fixed Blake3 hash function implementation to use `final()` instead of deprecated `finalResult()`

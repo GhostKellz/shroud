@@ -17,6 +17,7 @@ pub const RealIDPrivateKey = types.RealIDPrivateKey;
 pub const RealIDPublicKey = types.RealIDPublicKey;
 pub const RealIDSignature = types.RealIDSignature;
 pub const QID = types.QID;
+pub const GID = qid.GID; // Ghost ID alternative to RealID
 pub const DeviceFingerprint = types.DeviceFingerprint;
 pub const RealIDError = types.RealIDError;
 

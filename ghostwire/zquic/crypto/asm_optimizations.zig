@@ -7,6 +7,13 @@ const std = @import("std");
 const builtin = @import("builtin");
 const zcrypto = @import("zcrypto");
 
+/// Error types for crypto optimizations
+pub const CryptoOptError = error{
+    UnsupportedArchitecture,
+    InvalidInput,
+    InternalError,
+};
+
 pub const OptimizationLevel = enum {
     none,
     basic,
@@ -98,21 +105,21 @@ pub const OptimizedBlake3 = struct {
         return OptimizedBlake3{ .optimizer = optimizer };
     }
     
-    pub fn hash(self: *OptimizedBlake3, input: []const u8, output: []u8) void {
+    pub fn hash(self: *OptimizedBlake3, input: []const u8, output: []u8) CryptoOptError!void {
         switch (self.optimizer.optimization_level) {
-            .avx2 => self.hashAvx2(input, output),
-            .neon => self.hashNeon(input, output),
+            .avx2 => self.hashAvx2(input, output) catch self.hashFallback(input, output),
+            .neon => self.hashNeon(input, output) catch self.hashFallback(input, output),
             .basic => self.hashBasic(input, output),
             else => self.hashFallback(input, output),
         }
     }
     
     /// AVX2-optimized Blake3 (x86_64)
-    fn hashAvx2(self: *OptimizedBlake3, input: []const u8, output: []u8) void {
+    fn hashAvx2(self: *OptimizedBlake3, input: []const u8, output: []u8) CryptoOptError!void {
         _ = self;
         
         if (builtin.cpu.arch != .x86_64) {
-            @panic("AVX2 optimization only available on x86_64");
+            return CryptoOptError.UnsupportedArchitecture;
         }
         
         // Use zcrypto's optimized Blake3 with AVX2 hints
@@ -125,11 +132,11 @@ pub const OptimizedBlake3 = struct {
     }
     
     /// NEON-optimized Blake3 (ARM64)
-    fn hashNeon(self: *OptimizedBlake3, input: []const u8, output: []u8) void {
+    fn hashNeon(self: *OptimizedBlake3, input: []const u8, output: []u8) CryptoOptError!void {
         _ = self;
         
         if (builtin.cpu.arch != .aarch64) {
-            @panic("NEON optimization only available on ARM64");
+            return CryptoOptError.UnsupportedArchitecture;
         }
         
         // Use zcrypto's optimized Blake3 with NEON hints

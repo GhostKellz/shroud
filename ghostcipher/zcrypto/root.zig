@@ -48,7 +48,7 @@ pub const quic = @import("quic.zig");
 pub const ffi = @import("ffi.zig");
 
 // Version information  
-pub const version = "0.4.0";
+pub const version = "0.5.0";
 
 test {
     // Import all module tests

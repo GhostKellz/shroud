@@ -18,8 +18,9 @@ pub const ZSigError = error{
     InvalidSignatureLength,
     KeyGenerationFailed,
     SigningFailed,
-    VerificationFailed,
     UnsupportedAlgorithm,
+    SeedGenerationFailed,
+    VerificationFailed,
     InvalidAlgorithm,
     BackendNotInitialized,
     InvalidKeypair,
@@ -74,7 +75,7 @@ pub fn getKeySizes(algorithm: Algorithm) struct { public: usize, private: usize,
 /// Multi-algorithm crypto backend interface
 pub const CryptoInterface = struct {
     generateKeypairFn: *const fn (std.mem.Allocator, Algorithm) anyerror!Keypair,
-    keypairFromSeedFn: *const fn ([SEED_SIZE]u8, Algorithm) Keypair,
+    keypairFromSeedFn: *const fn ([SEED_SIZE]u8, Algorithm) ZSigError!Keypair,
     signFn: *const fn ([]const u8, Keypair) anyerror!Signature,
     verifyFn: *const fn ([]const u8, [SIGNATURE_SIZE]u8, [PUBLIC_KEY_SIZE]u8, Algorithm) bool,
     signWithContextFn: *const fn ([]const u8, []const u8, Keypair) anyerror!Signature,
@@ -243,13 +244,13 @@ pub const ZCryptoBackend = struct {
         };
     }
 
-    fn zcryptoKeypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) Keypair {
+    fn zcryptoKeypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) ZSigError!Keypair {
         return switch (algorithm) {
             .ed25519 => {
                 // For Ed25519, we can use std.crypto deterministic generation as fallback
                 // since zcrypto may not have seed-based generation in v0.5.0
                 const std_kp = std.crypto.sign.Ed25519.KeyPair.generateDeterministic(seed) catch {
-                    @panic("Failed to generate Ed25519 keypair from seed");
+                    return ZSigError.SeedGenerationFailed;
                 };
                 return Keypair{
                     .public_key = std_kp.public_key.bytes,
@@ -260,7 +261,7 @@ pub const ZCryptoBackend = struct {
             .ml_dsa_65 => {
                 // Try seed-based generation, fallback to error
                 const pq_keypair = zcrypto.pq.ml_dsa.ML_DSA_65.KeyPair.generate(seed) catch {
-                    @panic("UnsupportedAlgorithm: ML-DSA-65 seed-based generation not available");
+                    return ZSigError.UnsupportedAlgorithm;
                 };
                 
                 var public_key: [PUBLIC_KEY_SIZE]u8 = undefined;
@@ -279,7 +280,7 @@ pub const ZCryptoBackend = struct {
             },
             .hybrid_x25519_ml_kem => {
                 // Hybrid algorithms currently don't support seed-based generation
-                @panic("UnsupportedAlgorithm: Hybrid algorithms don't support seed-based generation");
+                return ZSigError.UnsupportedAlgorithm;
             },
         };
     }
@@ -394,12 +395,12 @@ pub const StdCryptoBackend = struct {
         };
     }
 
-    fn stdKeypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) Keypair {
+    fn stdKeypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) ZSigError!Keypair {
         // Only Ed25519 supported in std.crypto fallback
-        if (algorithm != .ed25519) @panic("UnsupportedAlgorithm");
+        if (algorithm != .ed25519) return ZSigError.UnsupportedAlgorithm;
 
         // Use std.crypto Ed25519 from seed
-        const kp = std.crypto.sign.Ed25519.KeyPair.generateDeterministic(seed) catch unreachable;
+        const kp = std.crypto.sign.Ed25519.KeyPair.generateDeterministic(seed) catch return ZSigError.SeedGenerationFailed;
 
         return Keypair{
             .public_key = kp.public_key.bytes,
@@ -468,11 +469,11 @@ pub fn generateKeypairDefault(allocator: std.mem.Allocator) !Keypair {
     return getBackend().generateKeypairFn(allocator, Algorithm.default);
 }
 
-pub fn keypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) Keypair {
+pub fn keypairFromSeed(seed: [SEED_SIZE]u8, algorithm: Algorithm) ZSigError!Keypair {
     return getBackend().keypairFromSeedFn(seed, algorithm);
 }
 
-pub fn keypairFromSeedDefault(seed: [SEED_SIZE]u8) Keypair {
+pub fn keypairFromSeedDefault(seed: [SEED_SIZE]u8) ZSigError!Keypair {
     return getBackend().keypairFromSeedFn(seed, Algorithm.default);
 }
 

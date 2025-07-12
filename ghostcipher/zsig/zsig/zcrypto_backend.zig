@@ -177,10 +177,10 @@ pub const ZCryptoInterface = struct {
         };
     }
 
-    fn signZCrypto(message: []const u8, secret_key: [64]u8) [64]u8 {
-        const ed25519_secret = std.crypto.sign.Ed25519.SecretKey.fromBytes(secret_key) catch unreachable;
-        const ed25519_keypair = std.crypto.sign.Ed25519.KeyPair.fromSecretKey(ed25519_secret) catch unreachable;
-        const signature = ed25519_keypair.sign(message, null) catch unreachable;
+    fn signZCrypto(message: []const u8, secret_key: [64]u8) error{SigningFailed}![64]u8 {
+        const ed25519_secret = std.crypto.sign.Ed25519.SecretKey.fromBytes(secret_key) catch return error.SigningFailed;
+        const ed25519_keypair = std.crypto.sign.Ed25519.KeyPair.fromSecretKey(ed25519_secret) catch return error.SigningFailed;
+        const signature = ed25519_keypair.sign(message, null) catch return error.SigningFailed;
         return signature.toBytes();
     }
 

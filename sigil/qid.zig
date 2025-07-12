@@ -5,6 +5,96 @@ const types = @import("types.zig");
 const RealIDPublicKey = types.RealIDPublicKey;
 const QID = types.QID;
 
+// Ghost ID (GID) - Alternative identity system for Ghost Chain
+pub const GID = struct {
+    /// Public key bytes (32 bytes for Ed25519)
+    public_key: [32]u8,
+    
+    /// Chain ID for multi-chain support
+    chain_id: u32,
+    
+    /// Entity type (wallet, validator, service, etc.)
+    entity_type: EntityType,
+    
+    /// Version for future compatibility
+    version: u8,
+    
+    pub const CURRENT_VERSION = 1;
+    
+    pub const EntityType = enum(u8) {
+        wallet = 0,
+        validator = 1,
+        service = 2,
+        contract = 3,
+        bridge = 4,
+        oracle = 5,
+    };
+    
+    /// Generate GID from RealID public key as alternative identity
+    pub fn fromRealIDKey(realid_key: RealIDPublicKey, chain_id: u32, entity_type: EntityType) GID {
+        return GID{
+            .public_key = realid_key.bytes,
+            .chain_id = chain_id,
+            .entity_type = entity_type,
+            .version = CURRENT_VERSION,
+        };
+    }
+    
+    /// Generate GID-based QID for routing
+    pub fn toQID(self: GID) QID {
+        // Create unique identifier from GID components
+        var hasher = std.crypto.hash.Blake3.init(.{});
+        hasher.update(&self.public_key);
+        hasher.update(std.mem.asBytes(&self.chain_id));
+        hasher.update(&[_]u8{@intFromEnum(self.entity_type)});
+        hasher.update(&[_]u8{self.version});
+        
+        var hash: [32]u8 = undefined;
+        hasher.final(&hash);
+        
+        // Create QID with Ghost-specific prefix
+        var qid_bytes: [16]u8 = undefined;
+        qid_bytes[0] = 0xfd; // ULA prefix
+        qid_bytes[1] = 0x01; // Ghost Chain prefix
+        @memcpy(qid_bytes[2..16], hash[0..14]);
+        
+        return QID{ .bytes = qid_bytes };
+    }
+    
+    /// Get GID as address string (Ghost address format)
+    pub fn toAddress(self: GID, allocator: std.mem.Allocator) ![]u8 {
+        // Create address from hash of GID components  
+        var hasher = std.crypto.hash.Blake3.init(.{});
+        hasher.update(&self.public_key);
+        hasher.update(std.mem.asBytes(&self.chain_id));
+        hasher.update(&[_]u8{@intFromEnum(self.entity_type)});
+        hasher.update(&[_]u8{self.version});
+        
+        var hash: [32]u8 = undefined;
+        hasher.final(&hash);
+        
+        // Use first 20 bytes for address
+        const address_bytes = hash[0..20];
+        
+        // Add prefix based on entity type
+        const prefix = switch (self.entity_type) {
+            .wallet => "ghost",
+            .validator => "gval",
+            .service => "gsvc", 
+            .contract => "gcon",
+            .bridge => "gbrg",
+            .oracle => "gorc",
+        };
+        
+        // Encode as hex with prefix
+        var result = try allocator.alloc(u8, prefix.len + 40);
+        @memcpy(result[0..prefix.len], prefix);
+        _ = std.fmt.bufPrint(result[prefix.len..], "{}", .{std.fmt.fmtSliceHexLower(address_bytes)}) catch unreachable;
+        
+        return result;
+    }
+};
+
 // IPv6 prefix for RealID QIDs (RFC 4193 Unique Local IPv6 Unicast Addresses)
 const REALID_IPV6_PREFIX = [_]u8{ 0xfd, 0x00 }; // fd00::/8 prefix
 
