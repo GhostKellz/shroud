@@ -1,41 +1,41 @@
 //! SHROUD Async Module
 //! Main entry point for all async functionality in SHROUD 1.0.0
-//! Integrates TokioZ v1.0.1 async runtime with SHROUD components
+//! Integrates zsync async runtime with SHROUD components
 
 const std = @import("std");
 
 // Re-export core async functionality
 pub const utils = @import("utils.zig");
-pub const tokioz_integration = @import("tokioz_integration.zig");
+pub const zsync_integration = @import("zsync_integration.zig");
 
 // Core types
 pub const ShroudRuntime = utils.ShroudRuntime;
 pub const AsyncAllocator = utils.AsyncAllocator;
 pub const ConnectionPool = utils.ConnectionPool;
-pub const TokioZRuntime = tokioz_integration.TokioZRuntime;
+pub const ZSyncRuntime = zsync_integration.ZSyncRuntime;
 
 // Networking primitives
-pub const AsyncTcp = tokioz_integration.AsyncTcp;
-pub const AsyncUdp = tokioz_integration.AsyncUdp;
+pub const AsyncTcp = zsync_integration.AsyncTcp;
+pub const AsyncUdp = zsync_integration.AsyncUdp;
 
 // Channel types
-pub const AsyncChannel = tokioz_integration.AsyncChannel;
+pub const AsyncChannel = zsync_integration.AsyncChannel;
 
 // Connection pools
-pub const AsyncConnectionPool = tokioz_integration.AsyncConnectionPool;
+pub const AsyncConnectionPool = zsync_integration.AsyncConnectionPool;
 
 // Batch processing
-pub const AsyncBatchProcessor = tokioz_integration.AsyncBatchProcessor;
+pub const AsyncBatchProcessor = zsync_integration.AsyncBatchProcessor;
 
 // Future combinators
-pub const AsyncCombinators = tokioz_integration.AsyncCombinators;
+pub const AsyncCombinators = zsync_integration.AsyncCombinators;
 
 /// SHROUD Async Runtime - Global singleton
-var global_runtime: ?*TokioZRuntime = null;
+var global_runtime: ?*ZSyncRuntime = null;
 var runtime_mutex = std.Thread.Mutex{};
 
 /// Initialize the global SHROUD async runtime
-pub fn initGlobalRuntime(allocator: std.mem.Allocator) !*TokioZRuntime {
+pub fn initGlobalRuntime(allocator: std.mem.Allocator) !*ZSyncRuntime {
     runtime_mutex.lock();
     defer runtime_mutex.unlock();
 
@@ -43,12 +43,12 @@ pub fn initGlobalRuntime(allocator: std.mem.Allocator) !*TokioZRuntime {
         return error.RuntimeAlreadyInitialized;
     }
 
-    global_runtime = try TokioZRuntime.init(allocator);
+    global_runtime = try ZSyncRuntime.init(allocator);
     return global_runtime.?;
 }
 
 /// Get the global SHROUD async runtime
-pub fn getGlobalRuntime() ?*TokioZRuntime {
+pub fn getGlobalRuntime() ?*ZSyncRuntime {
     runtime_mutex.lock();
     defer runtime_mutex.unlock();
 
@@ -132,7 +132,8 @@ pub const AsyncMetrics = struct {
         }
 
         self.total_tasks += 1;
-        self.tasks_by_type.set(task_type, self.tasks_by_type.get(task_type).? + 1);
+        const current_count = self.tasks_by_type.get(task_type) orelse 0;
+        self.tasks_by_type.put(task_type, current_count + 1);
     }
 
     pub fn recordTaskCompletion(self: *AsyncMetrics, duration_ms: f64, success: bool) void {

@@ -1,12 +1,12 @@
 //! SHROUD Async Runtime Integration
-//! Core async utilities and patterns for TokioZ v1.0.1 integration
+//! Core async utilities and patterns for zsync integration
 
 const std = @import("std");
 
 /// SHROUD Async Runtime - Central async coordination point
 pub const ShroudRuntime = struct {
     allocator: std.mem.Allocator,
-    task_registry: std.HashMap(u64, TaskInfo, std.hash_map.DefaultHashContext(u64), std.hash_map.default_max_load_percentage),
+    task_registry: std.ArrayHashMap(u64, TaskInfo, std.array_hash_map.AutoContext(u64), true),
     next_task_id: std.atomic.Value(u64),
 
     const TaskInfo = struct {
@@ -28,7 +28,7 @@ pub const ShroudRuntime = struct {
         const runtime = try allocator.create(ShroudRuntime);
         runtime.* = ShroudRuntime{
             .allocator = allocator,
-            .task_registry = std.HashMap(u64, TaskInfo, std.hash_map.DefaultHashContext(u64), std.hash_map.default_max_load_percentage).init(allocator),
+            .task_registry = std.ArrayHashMap(u64, TaskInfo, std.array_hash_map.AutoContext(u64), true).init(allocator),
             .next_task_id = std.atomic.Value(u64).init(1),
         };
         return runtime;

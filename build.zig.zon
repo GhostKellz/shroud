@@ -32,9 +32,9 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        .tokioZ = .{
-            .url = "https://github.com/ghostkellz/TokioZ/archive/refs/heads/main.tar.gz",
-            .hash = "tokioZ-1.0.1-P0qt07Z-AwDM-WcpwjDbb0cIN4qQaTHpDuuszJ4bus5D",
+        .zsync = .{
+            .url = "https://github.com/ghostkellz/zsync/archive/refs/heads/main.tar.gz",
+            .hash = "zsync-0.2.1-KAuheZSNDAAYt_Nj1gLjmyPd2mCEOylYUpyzENN0QtX6",
         },
     },
     .paths = .{

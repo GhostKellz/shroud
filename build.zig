@@ -22,8 +22,8 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
-    // Get TokioZ async runtime dependency
-    const tokioz = b.dependency("tokioZ", .{});
+    // Get zsync async runtime dependency
+    const zsync = b.dependency("zsync", .{});
 
     // Shroud v1.0 modular architecture - core modules
     const ghostcipher_mod = b.addModule("ghostcipher", .{
@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("zns/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 
@@ -51,7 +51,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("ghostwire/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 
@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("keystone/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 
@@ -72,7 +72,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("covenant/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 
@@ -87,7 +87,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "sigil", .module = sigil_mod },
             .{ .name = "ghostcipher", .module = ghostcipher_mod },
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 
@@ -105,7 +105,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "covenant", .module = covenant_mod },
             .{ .name = "shadowcraft", .module = shadowcraft_mod },
             .{ .name = "gwallet", .module = gwallet_mod },
-            .{ .name = "tokioz", .module = tokioz.module("TokioZ") },
+            .{ .name = "zsync", .module = zsync.module("zsync") },
         },
     });
 

@@ -1,8 +1,8 @@
-//! Shroud v1.0: Unified Cryptographic Framework with TokioZ v1.0.1 Async Runtime
+//! Shroud v1.0: Unified Cryptographic Framework with zsync Async Runtime
 //! Modular architecture integrating all Ghostchain crypto components with massive performance improvements
 const std = @import("std");
 
-// Async core - TokioZ v1.0.1 powered
+// Async core - zsync powered
 pub const async_runtime = @import("async/root.zig");
 
 // Core modules with async support
@@ -19,7 +19,7 @@ pub const shadowcraft = @import("shadowcraft");
 pub const gwallet = @import("gwallet");
 
 // Async runtime types
-pub const TokioZRuntime = async_runtime.TokioZRuntime;
+pub const ZSyncRuntime = async_runtime.ZSyncRuntime;
 pub const ShroudRuntime = async_runtime.ShroudRuntime;
 pub const AsyncMetrics = async_runtime.AsyncMetrics;
 
@@ -47,7 +47,7 @@ pub fn version() []const u8 {
 }
 
 /// Initialize SHROUD framework with async runtime
-pub fn init(allocator: std.mem.Allocator) !*TokioZRuntime {
+pub fn init(allocator: std.mem.Allocator) !*ZSyncRuntime {
     return try initAsyncRuntime(allocator);
 }
 

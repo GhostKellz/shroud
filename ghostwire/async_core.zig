@@ -401,7 +401,7 @@ pub const AsyncServerCore = struct {
             fn acceptConnections(server: *AsyncServerCore, tcp_listener: @TypeOf(listener)) !void {
                 _ = tcp_listener; // TODO: Real async accept implementation
                 while (!server.shutdown.load(.monotonic)) {
-                    // Accept would be async in real TokioZ implementation
+                    // Accept would be async in real zsync implementation
                     // const stream = try tcp_listener.accept();
                     // _ = try server.runtime.spawn(async server.handleTcpConnection(stream));
 
@@ -422,7 +422,7 @@ pub const AsyncServerCore = struct {
                 const buffer: [2048]u8 = undefined;
 
                 while (!server.shutdown.load(.monotonic)) {
-                    // Receive would be async in real TokioZ implementation
+                    // Receive would be async in real zsync implementation
                     // const result = try udp_socket.recvFrom(buffer[0..]);
                     // _ = try server.runtime.spawn(async server.handleQuicPacket(result.0, result.1));
 
