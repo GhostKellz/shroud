@@ -7,6 +7,12 @@ pub const guardian = @import("guardian.zig");
 pub const access_token = @import("access_token.zig");
 pub const identity = @import("identity.zig");
 
+// Export new advanced modules
+pub const zk_proof = @import("zk_proof.zig");
+pub const wasm_guardian = @import("wasm_guardian.zig");
+pub const cross_chain = @import("cross_chain.zig");
+pub const hierarchical_trust = @import("hierarchical_trust.zig");
+
 // Re-export commonly used types
 pub const Permission = guardian.Permission;
 pub const Role = guardian.Role;
@@ -16,6 +22,23 @@ pub const KeyPair = access_token.KeyPair;
 pub const Identity = identity.Identity;
 pub const IdentityManager = identity.IdentityManager;
 pub const Delegation = identity.Delegation;
+
+// Re-export new advanced types
+pub const ZkProof = zk_proof.ZkProof;
+pub const ZkAttestation = zk_proof.ZkAttestation;
+pub const ZkProofSystem = zk_proof.ZkProofSystem;
+pub const EphemeralIdentity = zk_proof.EphemeralIdentity;
+pub const PrivacyLevel = zk_proof.PrivacyLevel;
+pub const WasmGuardian = wasm_guardian.WasmGuardian;
+pub const WasmPolicyEngine = wasm_guardian.WasmPolicyEngine;
+pub const CrossChainIdentity = cross_chain.CrossChainIdentity;
+pub const CrossChainResolver = cross_chain.CrossChainResolver;
+pub const DID = cross_chain.DID;
+pub const ChainType = cross_chain.ChainType;
+pub const HierarchicalDelegation = hierarchical_trust.HierarchicalDelegation;
+pub const HierarchicalTrustManager = hierarchical_trust.HierarchicalTrustManager;
+pub const TrustLevel = hierarchical_trust.TrustLevel;
+pub const TrustMetrics = hierarchical_trust.TrustMetrics;
 
 // Re-export commonly used functions
 pub const generateKeyPair = access_token.generateKeyPair;
