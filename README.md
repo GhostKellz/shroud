@@ -1,94 +1,123 @@
-# 🕸️ Shroud
+# 🕶️ Shroud
 
-[![Zig Version](https://img.shields.io/badge/Zig-0.15.0-orange.svg)](https://ziglang.org/)
-[![Blockchain](https://img.shields.io/badge/Blockchain-Ghostchain-purple.svg)](https://ghostchain.org/)
-[![Layer 2](https://img.shields.io/badge/Layer%202-Compatible-blueviolet.svg)](https://ethereum.org/en/layer-2/)
-[![Crypto](https://img.shields.io/badge/Crypto-zcrypto-blue.svg)](https://github.com/ghostchain/zcrypto)
-[![ENS](https://img.shields.io/badge/ENS-Compatible-lightblue.svg)](https://ens.domains/)
-[![Web3](https://img.shields.io/badge/Web3-Compatible-brightgreen.svg)](https://web3.foundation/)
-[![QUIC](https://img.shields.io/badge/Protocol-QUIC-green.svg)](https://quicwg.org/)
-[![HTTP/3](https://img.shields.io/badge/Protocol-HTTP%2F3-brightgreen.svg)](https://httpwg.org/specs/rfc9114.html)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> Identity & Privacy Layer for Zero-Trust Systems
 
-> A high-performance, zero-trust cryptographic and network framework for Ghostchain and the Web5 ecosystem.
+**Shroud** is a modular identity and privacy framework designed for secure access control, anonymous delegation, and policy enforcement in decentralized environments.
 
 ---
 
-## 🔥 What is Shroud?
+## ✨ Features
 
-**Shroud** is a modular framework for secure, verifiable, high-speed communication over modern internet infrastructure. It bridges **Web2 protocols (DNS, HTTP3, QUIC)** with **Web3 primitives (DIDs, ZNS, QID, cryptographic identity)**.
+* 🔐 **Decentralized Identity (DID)** abstraction
+* 🧠 **Guardian Policy Engine**
 
-It powers key components of the **Ghostchain** protocol stack, and enables zero-trust service layers for the decentralized internet.
+  * Role-based and permission-based access
+  * Hierarchical trust delegation
+* 🕵️ **Privacy Enforcement**
 
----
+  * Ephemeral identities & tokenization
+  * Non-linkable session tokens
+* 📜 **Access Contracts**
 
-## 🧹 Core Modules
+  * Signed, verifiable access grants
+  * Policy-bound delegation tokens
+* ⚖️ **Composable with Keystone**
 
-| Module        | Purpose                                                                  |
-| ------------- | ------------------------------------------------------------------------ |
-| `ghostwire`   | High-speed networking: QUIC, HTTP/3, DNS, secure tunnels                 |
-| `ghostcipher` | Cryptographic primitives: zcrypto, zsig, post-quantum readiness          |
-| `keystone`    | Transaction ledger and state layer: records, tokens, chain state         |
-| `sigil`       | Identity resolution: Ghostchain ID (GID), DIDs, QIDs, decentralized auth |
-| `zns`         | Domain name system: ZNS, .ghost/.bc/.gcc/.sig resolution                 |
-| `shadowcraft` | Identity enforcement and zero-trust logic engine (AuthContext, policies) |
-| `guardian`    | Multi-sig, watchdog enforcement, identity-level access control           |
-| `covenant`    | Smart contract policy ruleset engine for conditional validation          |
-| `gwallet`     | GhostWallet: Secure programmable wallet with Sigil identity integration |
+  * Plug into any ledger or app layer
+  * Use with Keystone, Ghostchain, or standalone
 
 ---
 
-## 💡 Modules Overview
+## 🧩 Modules
 
-* **`ghostwire`** – Networking core
-* **`ghostcipher`** – Cryptography + signing
-* **`keystone`** – Ledger and state
-* **`sigil`** – Identity stack for Ghostchain ID (GID)
-* **`zns`** – Name system (like ENS)
-* **`shadowcraft`** – Runtime identity enforcement (AuthContext)
-* **`guardian`** – Access and signature enforcement
-* **`covenant`** – Contract rules, validation logic
-* **`gwallet`** – GhostWallet CLI and library for secure wallet operations
+### `guardian.zig`
+
+Policy enforcement engine. Defines:
+
+* `Permission`
+* `Role`
+* `GuardianError`
+
+### `identity.zig`
+
+Identity model & delegation logic:
+
+* Ephemeral identity signing
+* DID generation & verification
+
+### `access_token.zig`
+
+Access token generation and validation:
+
+* Signature-bound permissions
+* Expiration & time windows
 
 ---
 
-## 🚀 Quick Start
+## 🔗 Integrations
 
-### GhostWallet (gwallet)
+* ✅ Keystone (consensus layer)
+* ✅ Ghostchain (zk-powered L2)
+* ✅ ZNS (identity binding)
+* ✅ ZVM (smart identity-aware execution)
+
+---
+
+## 🚧 Roadmap
+
+* [x] Guardian permission framework
+* [x] Identity + token delegation
+* [ ] zkProof-based identity attestations
+* [ ] WASM-compatible policy validation
+* [ ] Integration with ZNS + walletd
+
+---
+
+## 📂 Repo Structure
+
+```
+shroud/
+├── src/
+│   ├── guardian.zig
+│   ├── identity.zig
+│   ├── access_token.zig
+├── tests/
+│   ├── guardian_test.zig
+│   └── identity_test.zig
+├── README.md
+└── build.zig
+```
+
+---
+
+## 🛠️ Build
+
 ```bash
-# Build and run GhostWallet
-zig build gwallet
-
-# Create a new wallet
-./zig-out/bin/gwallet generate --type ed25519 --name myname
-
-# Import existing wallet
-./zig-out/bin/gwallet import --mnemonic "word1 word2 ..."
-
-# Check balance
-./zig-out/bin/gwallet balance --token gcc
-
-# Send tokens
-./zig-out/bin/gwallet send --to recipient.ghost --amount 420 --token gcc
-
-# Start Web3 bridge for dApp integration
-./zig-out/bin/gwallet --bridge --port 8080
-```
-
-### Library Usage
-```zig
-const shroud = @import("shroud");
-
-// Access GhostWallet functionality
-const wallet = try shroud.gwallet.createWallet(allocator, "passphrase", .hybrid);
-defer wallet.deinit();
-
-// Use other Shroud modules
-const identity = try shroud.sigil.createIdentity(allocator);
-const domain_result = try shroud.zns.resolve("example.ghost");
+zig build
+zig build test
 ```
 
 ---
 
-> The Shroud framework is the foundation of Ghostchain's gateway to Web5 — where traditional protocols meet decentralized trust.
+## 🧠 Philosophy
+
+Shroud is designed to be:
+
+* 🔌 **Composable** — drop into any stack
+* 🕳️ **Opaque by default** — zero-knowledge friendly
+* 💡 **Minimalist** — core logic only, no runtime bloat
+
+> Shroud doesn’t store state. It validates intent.
+
+---
+
+## 📜 License
+
+MIT
+
+---
+
+## 👤 Author
+
+**GhostKellz**  |  [https://ghostkellz.sh](https://ghostkellz.sh)
 

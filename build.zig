@@ -22,91 +22,24 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
-    // Get zsync async runtime dependency
-    const zsync = b.dependency("zsync", .{});
-
-    // Shroud v1.0 modular architecture - core modules
-    const ghostcipher_mod = b.addModule("ghostcipher", .{
-        .root_source_file = b.path("ghostcipher/root.zig"),
-        .target = target,
-    });
-
-    const sigil_mod = b.addModule("sigil", .{
-        .root_source_file = b.path("sigil/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "ghostcipher", .module = ghostcipher_mod },
-        },
-    });
-
-    const zns_mod = b.addModule("zns", .{
-        .root_source_file = b.path("zns/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
-    });
-
-    const ghostwire_mod = b.addModule("ghostwire", .{
-        .root_source_file = b.path("ghostwire/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
-    });
-
-    const keystone_mod = b.addModule("keystone", .{
-        .root_source_file = b.path("keystone/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
-    });
-
-    const guardian_mod = b.addModule("guardian", .{
-        .root_source_file = b.path("guardian/root.zig"),
-        .target = target,
-    });
-
-    const covenant_mod = b.addModule("covenant", .{
-        .root_source_file = b.path("covenant/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
-    });
-
-    const shadowcraft_mod = b.addModule("shadowcraft", .{
-        .root_source_file = b.path("shadowcraft/root.zig"),
-        .target = target,
-    });
-
-    const gwallet_mod = b.addModule("gwallet", .{
-        .root_source_file = b.path("gwallet/src/root.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "sigil", .module = sigil_mod },
-            .{ .name = "ghostcipher", .module = ghostcipher_mod },
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
-    });
-
-    // Main shroud module that aggregates everything
+    // This creates a module, which represents a collection of source files alongside
+    // some compilation options, such as optimization mode and linked system libraries.
+    // Zig modules are the preferred way of making Zig code available to consumers.
+    // addModule defines a module that we intend to make available for importing
+    // to our consumers. We must give it a name because a Zig package can expose
+    // multiple modules and consumers will need to be able to specify which
+    // module they want to access.
     const mod = b.addModule("shroud", .{
+        // The root source file is the "entry point" of this module. Users of
+        // this module will only be able to access public declarations contained
+        // in this file, which means that if you have declarations that you
+        // intend to expose to consumers that were defined in other files part
+        // of this module, you will have to make sure to re-export them from
+        // the root file.
         .root_source_file = b.path("src/root.zig"),
+        // Later on we'll use this module as the root module of a test executable
+        // which requires us to specify a target.
         .target = target,
-        .imports = &.{
-            .{ .name = "ghostcipher", .module = ghostcipher_mod },
-            .{ .name = "sigil", .module = sigil_mod },
-            .{ .name = "zns", .module = zns_mod },
-            .{ .name = "ghostwire", .module = ghostwire_mod },
-            .{ .name = "keystone", .module = keystone_mod },
-            .{ .name = "guardian", .module = guardian_mod },
-            .{ .name = "covenant", .module = covenant_mod },
-            .{ .name = "shadowcraft", .module = shadowcraft_mod },
-            .{ .name = "gwallet", .module = gwallet_mod },
-            .{ .name = "zsync", .module = zsync.module("zsync") },
-        },
     });
 
     // Here we define an executable. An executable needs to have a root module
@@ -203,72 +136,51 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
+    // Individual test files for focused testing
+    const guardian_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/guardian_test.zig"),
+            .target = target,
+        }),
+    });
+    
+    const token_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/token_test.zig"),
+            .target = target,
+        }),
+    });
+    
+    const identity_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/identity_test.zig"),
+            .target = target,
+        }),
+    });
+
+    const run_guardian_tests = b.addRunArtifact(guardian_tests);
+    const run_token_tests = b.addRunArtifact(token_tests);
+    const run_identity_tests = b.addRunArtifact(identity_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
-    const test_step = b.step("test", "Run tests");
+    const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
-
-    // GWallet CLI executable
-    const gwallet_exe = b.addExecutable(.{
-        .name = "gwallet",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("gwallet/src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "gwallet", .module = gwallet_mod },
-            },
-        }),
-    });
-
-    b.installArtifact(gwallet_exe);
-
-    // GWallet run step
-    const gwallet_run_step = b.step("gwallet", "Run GhostWallet CLI");
-    const gwallet_run_cmd = b.addRunArtifact(gwallet_exe);
-    gwallet_run_step.dependOn(&gwallet_run_cmd.step);
-    gwallet_run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        gwallet_run_cmd.addArgs(args);
-    }
-
-    // Benchmark executable
-    const bench_exe = b.addExecutable(.{
-        .name = "shroud-bench",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("bench.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "shroud", .module = mod },
-            },
-        }),
-    });
-
-    b.installArtifact(bench_exe);
-
-    // Benchmark run step
-    const bench_run_step = b.step("bench", "Run Shroud performance benchmarks");
-    const bench_run_cmd = b.addRunArtifact(bench_exe);
-    bench_run_step.dependOn(&bench_run_cmd.step);
-    bench_run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        bench_run_cmd.addArgs(args);
-    }
-
-    // FFI Library builds for Rust integration
-    const ffi_step = b.step("ffi", "Build FFI libraries for Rust integration");
-
-    // Import the FFI build configuration
-    const build_ffi = @import("ghostwire/zquic/ffi/build_ffi.zig");
-    build_ffi.buildFfi(b, target, optimize);
-
-    // Make FFI depend on install step
-    ffi_step.dependOn(b.getInstallStep());
+    test_step.dependOn(&run_guardian_tests.step);
+    test_step.dependOn(&run_token_tests.step);
+    test_step.dependOn(&run_identity_tests.step);
+    
+    // Individual test steps
+    const guardian_test_step = b.step("test-guardian", "Run guardian tests");
+    guardian_test_step.dependOn(&run_guardian_tests.step);
+    
+    const token_test_step = b.step("test-token", "Run token tests");
+    token_test_step.dependOn(&run_token_tests.step);
+    
+    const identity_test_step = b.step("test-identity", "Run identity tests");
+    identity_test_step.dependOn(&run_identity_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
