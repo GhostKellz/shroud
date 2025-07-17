@@ -1,6 +1,11 @@
 const std = @import("std");
 const guardian = @import("guardian.zig");
 const access_token = @import("access_token.zig");
+const qid = @import("qid.zig");
+
+// Constants for passphrase-based key derivation
+const PBKDF2_ITERATIONS = 100000;
+const SALT_PREFIX = "SHROUD-v1";
 
 pub const IdentityError = error{
     InvalidIdentity,
@@ -9,7 +14,47 @@ pub const IdentityError = error{
     TokenExpired,
     AccessDenied,
     InvalidDelegation,
+    InvalidPassphrase,
+    CryptoError,
     OutOfMemory,
+    BufferTooSmall,
+    NoSpaceLeft,
+};
+
+/// Options for identity generation
+pub const IdentityGenerationOptions = struct {
+    passphrase: ?[]const u8 = null,
+    device_binding: bool = false,
+    hsm_provider: ?HSMProvider = null,
+};
+
+/// HSM Provider configuration (Azure Key Vault support)
+pub const HSMProvider = struct {
+    provider_type: HSMType,
+    config: HSMConfig,
+    
+    pub const HSMType = enum {
+        azure_key_vault,
+        // Future: hardware_security_module, aws_kms, etc.
+    };
+    
+    pub const HSMConfig = union(HSMType) {
+        azure_key_vault: AzureKeyVaultConfig,
+    };
+    
+    pub const AzureKeyVaultConfig = struct {
+        vault_url: []const u8,
+        client_id: []const u8,
+        tenant_id: []const u8,
+        key_name: []const u8,
+    };
+};
+
+/// Keypair for SHROUD identity
+pub const IdentityKeyPair = struct {
+    private_key: [64]u8, // Ed25519 private key
+    public_key: [32]u8,  // Ed25519 public key
+    qid: qid.QID,        // IPv6 QID derived from public key
 };
 
 pub const Identity = struct {
@@ -76,7 +121,102 @@ pub const Identity = struct {
         
         return token;
     }
+    
+    /// Generate QID for this identity
+    pub fn generateQID(self: *const Identity) qid.QID {
+        return qid.QID.fromPublicKey(self.public_key.bytes[0..32]);
+    }
 };
+
+/// Generate identity keypair from passphrase (RealID legacy pattern)
+pub fn generateIdentityFromPassphrase(passphrase: []const u8) IdentityError!IdentityKeyPair {
+    if (passphrase.len == 0) {
+        return IdentityError.InvalidPassphrase;
+    }
+
+    // Create salt from passphrase and prefix using SHA-256
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    hasher.update(SALT_PREFIX);
+    hasher.update(passphrase);
+    const salt = hasher.finalResult();
+
+    // Derive key material using PBKDF2-SHA256
+    var key_material: [64]u8 = undefined;
+    std.crypto.pwhash.pbkdf2(&key_material, passphrase, &salt, PBKDF2_ITERATIONS, std.crypto.auth.hmac.sha2.HmacSha256) catch {
+        return IdentityError.CryptoError;
+    };
+
+    // Create Ed25519 keypair from seed
+    const seed = key_material[0..32].*;
+    const keypair = std.crypto.sign.Ed25519.KeyPair.generateDeterministic(seed) catch {
+        return IdentityError.CryptoError;
+    };
+
+    // Generate QID from public key
+    const identity_qid = qid.QID.fromPublicKey(&keypair.public_key.bytes);
+
+    return IdentityKeyPair{
+        .private_key = keypair.secret_key.bytes,
+        .public_key = keypair.public_key.bytes,
+        .qid = identity_qid,
+    };
+}
+
+/// Generate identity using options (passphrase, HSM, etc.)
+pub fn generateIdentity(allocator: std.mem.Allocator, options: IdentityGenerationOptions) IdentityError!Identity {
+    var keypair: IdentityKeyPair = undefined;
+    
+    if (options.passphrase) |passphrase| {
+        // Generate from passphrase
+        keypair = try generateIdentityFromPassphrase(passphrase);
+    } else if (options.hsm_provider) |hsm| {
+        // Generate using HSM
+        keypair = try generateIdentityFromHSM(hsm);
+    } else {
+        // Generate random keypair
+        keypair = try generateRandomIdentity();
+    }
+    
+    // Create identity with generated public key
+    const public_key = access_token.PublicKey{ .bytes = keypair.public_key };
+    
+    // Use QID as identity ID for now (can be enhanced later)
+    var qid_buffer: [40]u8 = undefined;
+    const qid_str = try keypair.qid.toString(&qid_buffer);
+    const identity_id = try allocator.dupe(u8, qid_str);
+    
+    var identity = Identity.init(allocator, identity_id, public_key);
+    
+    // Add QID as metadata
+    try identity.setMetadata("qid", qid_str);
+    try identity.setMetadata("generation_method", if (options.passphrase != null) "passphrase" else "random");
+    
+    return identity;
+}
+
+/// Generate identity from HSM (Azure Key Vault support)
+fn generateIdentityFromHSM(hsm: HSMProvider) IdentityError!IdentityKeyPair {
+    switch (hsm.provider_type) {
+        .azure_key_vault => {
+            // TODO: Implement Azure Key Vault integration
+            // For now, return error as placeholder
+            return IdentityError.CryptoError;
+        },
+    }
+}
+
+/// Generate random identity keypair
+fn generateRandomIdentity() IdentityError!IdentityKeyPair {
+    const keypair = std.crypto.sign.Ed25519.KeyPair.generate();
+    
+    const identity_qid = qid.QID.fromPublicKey(&keypair.public_key.bytes);
+    
+    return IdentityKeyPair{
+        .private_key = keypair.secret_key.bytes,
+        .public_key = keypair.public_key.bytes,
+        .qid = identity_qid,
+    };
+}
 
 pub const Delegation = struct {
     delegator: []const u8,

@@ -1,4 +1,5 @@
 const std = @import("std");
+const device = @import("device.zig");
 
 pub const GuardianError = error{
     AccessDenied,
@@ -131,6 +132,63 @@ pub const Guardian = struct {
     }
 };
 
+/// Device-aware access context with device fingerprinting
+pub const DeviceAccessContext = struct {
+    user_id: []const u8,
+    roles: std.ArrayList([]const u8),
+    resource_path: []const u8,
+    operation: Permission,
+    device_fingerprint: ?device.DeviceFingerprint,
+    device_policy: ?*const device.DevicePolicy,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, user_id: []const u8, resource: []const u8, operation: Permission) DeviceAccessContext {
+        return DeviceAccessContext{
+            .user_id = user_id,
+            .roles = std.ArrayList([]const u8).init(allocator),
+            .resource_path = resource,
+            .operation = operation,
+            .device_fingerprint = null,
+            .device_policy = null,
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *DeviceAccessContext) void {
+        self.roles.deinit();
+        // Note: we don't own device_policy, so don't deinit it
+    }
+
+    pub fn addRole(self: *DeviceAccessContext, role: []const u8) !void {
+        try self.roles.append(role);
+    }
+
+    pub fn setDeviceFingerprint(self: *DeviceAccessContext, fingerprint: device.DeviceFingerprint) void {
+        self.device_fingerprint = fingerprint;
+    }
+
+    pub fn setDevicePolicy(self: *DeviceAccessContext, policy: *const device.DevicePolicy) void {
+        self.device_policy = policy;
+    }
+
+    pub fn hasRole(self: *const DeviceAccessContext, role: []const u8) bool {
+        for (self.roles.items) |r| {
+            if (std.mem.eql(u8, r, role)) return true;
+        }
+        return false;
+    }
+
+    pub fn isDeviceAllowed(self: *const DeviceAccessContext) bool {
+        if (self.device_policy) |policy| {
+            if (self.device_fingerprint) |fingerprint| {
+                return policy.isDeviceAllowed(fingerprint);
+            }
+            return !policy.require_device_binding;
+        }
+        return true; // No device policy means allow all devices
+    }
+};
+
 pub fn createBasicRoles(guardian: *Guardian) !void {
     try guardian.addRole("admin", &[_]Permission{ .read, .write, .execute, .admin, .delegate });
     try guardian.addRole("user", &[_]Permission{ .read, .write });
@@ -139,4 +197,29 @@ pub fn createBasicRoles(guardian: *Guardian) !void {
 
 pub fn version() []const u8 {
     return "0.1.0";
+}
+
+/// Check device permission with device-aware context
+pub fn checkDevicePermission(guardian: *const Guardian, context: *const DeviceAccessContext, permission: Permission) GuardianError!void {
+    // First check device access
+    if (!context.isDeviceAllowed()) {
+        return GuardianError.AccessDenied;
+    }
+
+    // Then check standard permission
+    return checkPermission(guardian, @ptrCast(context), permission);
+}
+
+/// Check permission (standard method, kept for compatibility)
+pub fn checkPermission(guardian: *const Guardian, context: *const AccessContext, permission: Permission) GuardianError!void {
+    // Check if user has any role that grants this permission
+    for (context.roles.items) |role_name| {
+        if (guardian.roles.get(role_name)) |role| {
+            for (role.permissions) |perm| {
+                if (perm == permission) return; // Permission granted
+            }
+        }
+    }
+    
+    return GuardianError.AccessDenied;
 }

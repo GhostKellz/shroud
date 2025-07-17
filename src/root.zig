@@ -6,6 +6,8 @@ const std = @import("std");
 pub const guardian = @import("guardian.zig");
 pub const access_token = @import("access_token.zig");
 pub const identity = @import("identity.zig");
+pub const qid = @import("qid.zig");
+pub const device = @import("device.zig");
 
 // Export new advanced modules
 pub const zk_proof = @import("zk_proof.zig");
@@ -22,6 +24,13 @@ pub const KeyPair = access_token.KeyPair;
 pub const Identity = identity.Identity;
 pub const IdentityManager = identity.IdentityManager;
 pub const Delegation = identity.Delegation;
+pub const QID = qid.QID;
+pub const IdentityKeyPair = identity.IdentityKeyPair;
+pub const IdentityGenerationOptions = identity.IdentityGenerationOptions;
+pub const DeviceFingerprint = device.DeviceFingerprint;
+pub const DevicePolicy = device.DevicePolicy;
+pub const BoundIdentity = device.BoundIdentity;
+pub const DeviceAccessContext = guardian.DeviceAccessContext;
 
 // Re-export new advanced types
 pub const ZkProof = zk_proof.ZkProof;
@@ -46,6 +55,12 @@ pub const generateEphemeralKeyPair = access_token.generateEphemeralKeyPair;
 pub const signData = access_token.signData;
 pub const verifyData = access_token.verifyData;
 pub const createBasicRoles = guardian.createBasicRoles;
+
+// Convenience functions for RealID legacy features
+pub const generateIdentityFromPassphrase = identity.generateIdentityFromPassphrase;
+pub const generateIdentity = identity.generateIdentity;
+pub const generateDeviceFingerprint = device.generateDeviceFingerprint;
+pub const checkDevicePermission = guardian.checkDevicePermission;
 
 pub fn version() []const u8 {
     return "0.1.0";
