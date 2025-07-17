@@ -105,7 +105,7 @@ pub const DIDDocument = struct {
     /// Generate QID from this DID document's primary key
     pub fn generateQID(self: *const DIDDocument) ?qid.QID {
         if (self.public_keys.items.len == 0) return null;
-        
+
         // Use first Ed25519 key for QID generation
         for (self.public_keys.items) |*key| {
             if (key.type == .ed25519) {
@@ -123,7 +123,7 @@ pub const DIDDocument = struct {
 pub const CacheEntry = struct {
     document: DIDDocument,
     expires_at: i64,
-    
+
     pub fn isExpired(self: *const CacheEntry) bool {
         return std.time.milliTimestamp() > self.expires_at;
     }
@@ -243,10 +243,10 @@ pub const DIDResolver = struct {
 
         // Resolve from network/storage
         const document = try self.resolveFromSource(did);
-        
+
         // Cache the result
         try self.cacheDocument(did, document);
-        
+
         return document;
     }
 
@@ -254,12 +254,12 @@ pub const DIDResolver = struct {
     pub fn batchResolveDIDs(self: *DIDResolver, request: BatchResolutionRequest) !BatchResolutionResponse {
         const start_time = std.time.milliTimestamp();
         var response = BatchResolutionResponse.init(self.allocator);
-        
+
         response.metadata.total_requested = @intCast(request.dids.len);
 
         for (request.dids) |did| {
             const resolve_start = std.time.milliTimestamp();
-            
+
             var result = BatchResolutionResponse.ResolutionResult{
                 .did = did,
                 .document = null,
@@ -299,7 +299,7 @@ pub const DIDResolver = struct {
             }
 
             result.resolution_time_ms = @intCast(std.time.milliTimestamp() - resolve_start);
-            
+
             if (result.document != null) {
                 response.metadata.successful += 1;
             } else {
@@ -318,7 +318,7 @@ pub const DIDResolver = struct {
         // Perform compliance checks if transaction context is provided
         if (request.transaction_context) |tx_context| {
             try self.performComplianceChecks(tx_context);
-            
+
             // Check if manual review is required
             if (tx_context.requiresManualReview()) {
                 return error.ManualReviewRequired;
@@ -337,7 +337,7 @@ pub const DIDResolver = struct {
 
     fn performComplianceChecks(self: *DIDResolver, tx_context: *const TransactionContext) !void {
         _ = self;
-        
+
         // Simulate compliance checks
         for (tx_context.compliance_flags.items) |flag| {
             switch (flag.flag_type) {
@@ -378,7 +378,7 @@ pub const DIDResolver = struct {
 
     fn validateAuthorizationTokens(self: *DIDResolver, request: *const TransactionAwareBatchResolutionRequest) !void {
         _ = self;
-        
+
         if (request.authorization_tokens.items.len == 0) {
             return; // No tokens to validate
         }
@@ -388,7 +388,7 @@ pub const DIDResolver = struct {
             if (token.len < 32) {
                 return error.InvalidAuthorizationToken;
             }
-            
+
             // In a real implementation, we would:
             // 1. Parse the token (JWT, etc.)
             // 2. Verify the signature
@@ -400,7 +400,7 @@ pub const DIDResolver = struct {
 
     fn applyPolicyRequirements(self: *DIDResolver, request: *const TransactionAwareBatchResolutionRequest) !void {
         _ = self;
-        
+
         if (request.policy_requirements.items.len == 0) {
             return; // No policy requirements
         }
@@ -408,7 +408,7 @@ pub const DIDResolver = struct {
         for (request.policy_requirements.items) |policy_name| {
             // Simulate policy application
             std.log.info("Applying policy requirement: {s}", .{policy_name});
-            
+
             // In a real implementation, we would:
             // 1. Load the policy from the policy engine
             // 2. Evaluate the policy against the current context
@@ -416,8 +416,6 @@ pub const DIDResolver = struct {
             // 4. Log policy decisions for audit
         }
     }
-
-
 
     /// Clear expired entries from cache
     pub fn cleanCache(self: *DIDResolver) void {
@@ -470,7 +468,7 @@ pub const DIDResolver = struct {
         // 1. Parse DID to determine method
         // 2. Route to appropriate resolver (blockchain, DNS, etc.)
         // 3. Fetch and parse DID document
-        
+
         if (std.mem.startsWith(u8, did, "did:shroud:")) {
             return self.resolveShroudDID(did);
         } else if (std.mem.startsWith(u8, did, "did:key:")) {
@@ -483,42 +481,33 @@ pub const DIDResolver = struct {
     /// Resolve SHROUD-specific DID
     fn resolveShroudDID(self: *DIDResolver, did: []const u8) ResolutionError!DIDDocument {
         var document = DIDDocument.init(self.allocator, did);
-        
+
         // Create a sample key entry
-        var key = DIDDocument.PublicKeyEntry.init(
-            self.allocator,
-            "key-1",
-            .ed25519,
-            "sample-public-key-base58"
-        );
+        var key = DIDDocument.PublicKeyEntry.init(self.allocator, "key-1", .ed25519, "sample-public-key-base58");
         try key.purposes.append(.authentication);
         try key.purposes.append(.assertion_method);
-        
+
         try document.addPublicKey(key);
-        
+
         // Add authentication reference
         try document.authentication.append("key-1");
         try document.assertion_method.append("key-1");
-        
+
         return document;
     }
 
     /// Resolve key-based DID
     fn resolveKeyDID(self: *DIDResolver, did: []const u8) ResolutionError!DIDDocument {
         var document = DIDDocument.init(self.allocator, did);
-        
+
         // Extract public key from DID (simplified)
-        var key = DIDDocument.PublicKeyEntry.init(
-            self.allocator,
-            "key-1",
-            .ed25519,
-            did[8..] // Skip "did:key:" prefix
+        var key = DIDDocument.PublicKeyEntry.init(self.allocator, "key-1", .ed25519, did[8..] // Skip "did:key:" prefix
         );
         try key.purposes.append(.authentication);
-        
+
         try document.addPublicKey(key);
         try document.authentication.append("key-1");
-        
+
         return document;
     }
 
@@ -527,7 +516,7 @@ pub const DIDResolver = struct {
         // Check cache size limit
         if (self.cache.count() >= self.max_cache_size) {
             self.cleanCache();
-            
+
             // If still at limit, remove oldest entry
             if (self.cache.count() >= self.max_cache_size) {
                 // Simple eviction: remove first entry
@@ -555,14 +544,14 @@ pub const DIDResolver = struct {
     pub fn createIdentityVerificationContext(self: *DIDResolver, transaction_id: []const u8, requester_did: []const u8, target_did: []const u8) !TransactionContext {
         var context = TransactionContext.init(self.allocator, transaction_id, .identity_verification, requester_did);
         context.setTargetDID(target_did);
-        
+
         // Add default compliance flags for identity verification
         try context.addComplianceFlag(.{
             .flag_type = .kyc_required,
             .severity = .medium,
             .description = "KYC verification required for identity transactions",
         });
-        
+
         return context;
     }
 
@@ -570,7 +559,7 @@ pub const DIDResolver = struct {
     pub fn createPaymentContext(self: *DIDResolver, transaction_id: []const u8, requester_did: []const u8, amount: u64, currency: []const u8) !TransactionContext {
         var context = TransactionContext.init(self.allocator, transaction_id, .payment, requester_did);
         context.setAmount(amount, currency);
-        
+
         // Add compliance flags based on amount
         if (amount > 10000) {
             try context.addComplianceFlag(.{
@@ -579,7 +568,7 @@ pub const DIDResolver = struct {
                 .description = "AML check required for high-value transactions",
             });
         }
-        
+
         if (amount > 50000) {
             try context.addComplianceFlag(.{
                 .flag_type = .manual_review,
@@ -587,7 +576,7 @@ pub const DIDResolver = struct {
                 .description = "Manual review required for very high-value transactions",
             });
         }
-        
+
         return context;
     }
 };
@@ -666,7 +655,7 @@ pub const TransactionContext = struct {
 
     pub fn addComplianceFlag(self: *TransactionContext, flag: ComplianceFlag) !void {
         try self.compliance_flags.append(flag);
-        
+
         // Update risk score based on flag severity
         const severity_weight: f32 = switch (flag.severity) {
             .low => 0.1,
@@ -731,12 +720,7 @@ test "DID document creation and management" {
     var document = DIDDocument.init(std.testing.allocator, "did:shroud:example");
     defer document.deinit();
 
-    var key = DIDDocument.PublicKeyEntry.init(
-        std.testing.allocator,
-        "key-1",
-        .ed25519,
-        "test-public-key"
-    );
+    var key = DIDDocument.PublicKeyEntry.init(std.testing.allocator, "key-1", .ed25519, "test-public-key");
     try key.purposes.append(.authentication);
     try document.addPublicKey(key);
 

@@ -15,21 +15,21 @@ pub const DeviceFingerprint = struct {
     /// Convert to hex string
     pub fn toHexString(self: DeviceFingerprint, buffer: []u8) ![]u8 {
         if (buffer.len < 64) return error.BufferTooSmall;
-        
+
         for (self.bytes, 0..) |byte, i| {
-            _ = std.fmt.bufPrint(buffer[i * 2..i * 2 + 2], "{x:0>2}", .{byte}) catch return error.BufferTooSmall;
+            _ = std.fmt.bufPrint(buffer[i * 2 .. i * 2 + 2], "{x:0>2}", .{byte}) catch return error.BufferTooSmall;
         }
-        
+
         return buffer[0..64];
     }
 
     /// Parse from hex string
     pub fn fromHexString(hex_str: []const u8) !DeviceFingerprint {
         if (hex_str.len != 64) return error.InvalidFormat;
-        
+
         var fingerprint = DeviceFingerprint{ .bytes = undefined };
         for (0..32) |i| {
-            const byte_hex = hex_str[i * 2..i * 2 + 2];
+            const byte_hex = hex_str[i * 2 .. i * 2 + 2];
             fingerprint.bytes[i] = std.fmt.parseInt(u8, byte_hex, 16) catch return error.InvalidFormat;
         }
         return fingerprint;
@@ -89,7 +89,7 @@ pub const DevicePolicy = struct {
 pub fn generateDeviceFingerprint(allocator: std.mem.Allocator) !DeviceFingerprint {
     var fingerprint_data = std.ArrayList(u8).init(allocator);
     defer fingerprint_data.deinit();
-    
+
     // Add consistent prefix for versioning
     try fingerprint_data.appendSlice("SHROUD-Device-v1");
 
@@ -197,7 +197,7 @@ pub const DeviceError = error{
 
 test "device fingerprint generation" {
     const fingerprint = try generateDeviceFingerprint(std.testing.allocator);
-    
+
     // Should be deterministic for same system
     const fingerprint2 = try generateDeviceFingerprint(std.testing.allocator);
     try std.testing.expect(fingerprint.eql(fingerprint2));
@@ -225,12 +225,12 @@ test "device policy management" {
 
 test "device fingerprint hex conversion" {
     const fingerprint = DeviceFingerprint{ .bytes = [_]u8{0xAB} ** 32 };
-    
+
     var buffer: [64]u8 = undefined;
     const hex_str = try fingerprint.toHexString(&buffer);
-    
+
     try std.testing.expect(std.mem.startsWith(u8, hex_str, "abab"));
-    
+
     const parsed = try DeviceFingerprint.fromHexString(hex_str);
     try std.testing.expect(fingerprint.eql(parsed));
 }

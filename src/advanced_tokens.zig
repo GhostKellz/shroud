@@ -13,7 +13,7 @@ pub const HierarchicalPermission = struct {
     pub fn init(allocator: std.mem.Allocator, path_str: []const u8) !HierarchicalPermission {
         var parts = std.ArrayList([]const u8).init(allocator);
         var iterator = std.mem.splitSequence(u8, path_str, ".");
-        
+
         while (iterator.next()) |part| {
             try parts.append(try allocator.dupe(u8, part));
         }
@@ -24,7 +24,7 @@ pub const HierarchicalPermission = struct {
         };
     }
 
-    pub fn deinit(self: *HierarchicalPermission) void {
+    pub fn deinit(self: *const HierarchicalPermission) void {
         for (self.path) |part| {
             self.allocator.free(part);
         }
@@ -40,7 +40,7 @@ pub const HierarchicalPermission = struct {
                 written += 1;
             }
             if (written + part.len > buffer.len) return error.BufferTooSmall;
-            @memcpy(buffer[written..written + part.len], part);
+            @memcpy(buffer[written .. written + part.len], part);
             written += part.len;
         }
         return buffer[0..written];
@@ -49,7 +49,7 @@ pub const HierarchicalPermission = struct {
     /// Check if this permission is a parent of another permission
     pub fn isParentOf(self: *const HierarchicalPermission, other: *const HierarchicalPermission) bool {
         if (self.path.len >= other.path.len) return false;
-        
+
         for (self.path, 0..) |part, i| {
             if (!std.mem.eql(u8, part, other.path[i])) return false;
         }
@@ -64,7 +64,7 @@ pub const HierarchicalPermission = struct {
     /// Check if this permission exactly matches another
     pub fn isExactMatch(self: *const HierarchicalPermission, other: *const HierarchicalPermission) bool {
         if (self.path.len != other.path.len) return false;
-        
+
         for (self.path, other.path) |self_part, other_part| {
             if (!std.mem.eql(u8, self_part, other_part)) {
                 return false;
@@ -94,7 +94,7 @@ pub const ConditionalPermission = struct {
 
         pub const TimeRange = struct {
             start_hour: u8, // 0-23
-            end_hour: u8,   // 0-23
+            end_hour: u8, // 0-23
             days_of_week: u8, // Bitmask: Sunday=1, Monday=2, etc.
         };
 
@@ -154,7 +154,7 @@ pub const ConditionalPermission = struct {
 
     fn evaluateCondition(self: *const ConditionalPermission, condition: Condition, context: *const PermissionContext) bool {
         _ = self; // Suppress unused parameter warning
-        
+
         switch (condition) {
             .time_range => |time_range| {
                 const current_time = std.time.timestamp();
@@ -298,7 +298,7 @@ pub const DelegationChain = struct {
         }
 
         // Check delegation continuity (delegate of link N is delegator of link N+1)
-        for (self.links.items[0..self.links.items.len - 1], 1..) |link, i| {
+        for (self.links.items[0 .. self.links.items.len - 1], 1..) |link, i| {
             const next_link = self.links.items[i];
             if (!std.mem.eql(u8, link.delegate, next_link.delegator)) {
                 return false;
@@ -315,7 +315,7 @@ pub const DelegationChain = struct {
         // Permission must exist in ALL links of the chain
         for (self.links.items) |link| {
             var found = false;
-            
+
             // Check direct permissions
             for (link.permissions.items) |*link_perm| {
                 if (link_perm.matches(permission)) {
@@ -421,10 +421,10 @@ pub const AdvancedAccessToken = struct {
     pub fn generateRefreshToken(self: *AdvancedAccessToken) ![]const u8 {
         var random_bytes: [32]u8 = undefined;
         std.crypto.random.bytes(&random_bytes);
-        
+
         const refresh_token = try self.allocator.alloc(u8, 64);
         _ = std.fmt.bufPrint(refresh_token, "{}", .{std.fmt.fmtSliceHexLower(&random_bytes)}) catch unreachable;
-        
+
         self.refresh_token = refresh_token;
         return refresh_token;
     }

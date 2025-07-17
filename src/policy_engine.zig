@@ -119,7 +119,7 @@ pub const PolicyTemplate = struct {
                 }
 
                 if (param_end < pattern.len) {
-                    const param_name = pattern[i + 1..param_end];
+                    const param_name = pattern[i + 1 .. param_end];
                     if (params.get(param_name)) |value| {
                         try result.appendSlice(value);
                     } else {
@@ -275,7 +275,7 @@ pub const Policy = struct {
 
     fn evaluateCondition(self: *const Policy, condition: PolicyCondition, context: *const advanced_tokens.PermissionContext) bool {
         _ = self;
-        
+
         switch (condition.condition_type) {
             .time_restriction => {
                 // Simple time check - allow during business hours
