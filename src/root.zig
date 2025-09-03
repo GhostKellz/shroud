@@ -67,14 +67,11 @@ pub fn version() []const u8 {
 }
 
 pub fn bufferedPrint() !void {
-    const stdout_file = std.fs.File.stdout().deprecatedWriter();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Shroud v{s} - Identity & Privacy Framework\n", .{version()});
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush();
+    // TODO: Update for Zig v0.16 io API changes
+    // const stdout = std.io.getStdOut().writer();
+    // try stdout.print("Shroud v{s} - Identity & Privacy Framework\n", .{version()});
+    // try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    _ = version(); // Avoid unused function warning
 }
 
 test "shroud version" {

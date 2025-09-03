@@ -109,9 +109,9 @@ test "device-aware access control" {
 
     // Create device-aware access context
     var context = shroud.DeviceAccessContext.init(std.testing.allocator, "test-user", "/test/resource", .read);
-    defer context.deinit();
+    defer context.deinit(std.testing.allocator);
 
-    try context.addRole("viewer");
+    try context.addRole(std.testing.allocator, "viewer");
     context.setDeviceFingerprint(device);
     context.setDevicePolicy(&policy);
 

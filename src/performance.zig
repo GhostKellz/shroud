@@ -87,7 +87,7 @@ pub const OptimizedCache = struct {
     pub fn init(allocator: std.mem.Allocator, max_size: usize, compression_enabled: bool) OptimizedCache {
         return OptimizedCache{
             .items = std.HashMap([]const u8, CacheItem, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .access_order = std.ArrayList([]const u8).init(allocator),
+            .access_order = std.ArrayList([]const u8){}
             .max_size = max_size,
             .compression_enabled = compression_enabled,
             .hit_count = 0,
@@ -103,7 +103,7 @@ pub const OptimizedCache = struct {
             self.allocator.free(entry.value_ptr.data);
         }
         self.items.deinit();
-        self.access_order.deinit();
+        self.access_order.deinit(self.allocator);
     }
 
     pub fn put(self: *OptimizedCache, key: []const u8, data: []const u8) !void {
@@ -133,7 +133,7 @@ pub const OptimizedCache = struct {
         };
 
         try self.items.put(try self.allocator.dupe(u8, key), item);
-        try self.access_order.append(try self.allocator.dupe(u8, key));
+        try self.access_order.append(self.allocator, try self.allocator.dupe(u8, key));
     }
 
     pub fn get(self: *OptimizedCache, key: []const u8) ?[]const u8 {
@@ -191,7 +191,7 @@ pub const OptimizedCache = struct {
             if (std.mem.eql(u8, access_key, key)) {
                 _ = self.access_order.orderedRemove(i);
                 // Add to end (most recent)
-                self.access_order.append(access_key) catch return;
+                self.access_order.append(self.allocator, access_key) catch return;
                 break;
             }
         }
@@ -235,7 +235,7 @@ pub const BatchOptimizer = struct {
 
     pub fn init(allocator: std.mem.Allocator, batch_size: usize, timeout_ms: i64) BatchOptimizer {
         return BatchOptimizer{
-            .pending_operations = std.ArrayList(BatchOperation).init(allocator),
+            .pending_operations = std.ArrayList(BatchOperation){}
             .batch_size_limit = batch_size,
             .batch_timeout_ms = timeout_ms,
             .last_flush = std.time.milliTimestamp(),
@@ -244,7 +244,7 @@ pub const BatchOptimizer = struct {
     }
 
     pub fn deinit(self: *BatchOptimizer) void {
-        self.pending_operations.deinit();
+        self.pending_operations.deinit(self.allocator);
     }
 
     pub fn addOperation(self: *BatchOptimizer, op_type: BatchOperation.OperationType, data: []const u8, callback: ?*const fn (result: []const u8) void) !void {
@@ -255,7 +255,7 @@ pub const BatchOptimizer = struct {
             .timestamp = std.time.milliTimestamp(),
         };
 
-        try self.pending_operations.append(operation);
+        try self.pending_operations.append(self.allocator, operation);
 
         // Check if we should flush
         if (self.shouldFlush()) {
@@ -267,21 +267,21 @@ pub const BatchOptimizer = struct {
         if (self.pending_operations.items.len == 0) return;
 
         // Group operations by type
-        var did_ops = std.ArrayList(BatchOperation).init(self.allocator);
-        defer did_ops.deinit();
-        var permission_ops = std.ArrayList(BatchOperation).init(self.allocator);
-        defer permission_ops.deinit();
-        var token_ops = std.ArrayList(BatchOperation).init(self.allocator);
-        defer token_ops.deinit();
-        var policy_ops = std.ArrayList(BatchOperation).init(self.allocator);
-        defer policy_ops.deinit();
+        var did_ops = std.ArrayList(BatchOperation){};
+        defer did_ops.deinit(self.allocator);
+        var permission_ops = std.ArrayList(BatchOperation){};
+        defer permission_ops.deinit(self.allocator);
+        var token_ops = std.ArrayList(BatchOperation){};
+        defer token_ops.deinit(self.allocator);
+        var policy_ops = std.ArrayList(BatchOperation){};
+        defer policy_ops.deinit(self.allocator);
 
         for (self.pending_operations.items) |op| {
             switch (op.operation_type) {
-                .did_resolution => try did_ops.append(op),
-                .permission_check => try permission_ops.append(op),
-                .token_validation => try token_ops.append(op),
-                .policy_evaluation => try policy_ops.append(op),
+                .did_resolution => try did_ops.append(self.allocator, op),
+                .permission_check => try permission_ops.append(self.allocator, op),
+                .token_validation => try token_ops.append(self.allocator, op),
+                .policy_evaluation => try policy_ops.append(self.allocator, op),
             }
         }
 
@@ -369,8 +369,8 @@ pub const ConnectionPool = struct {
 
     pub fn init(allocator: std.mem.Allocator, max_connections: usize) ConnectionPool {
         return ConnectionPool{
-            .connections = std.ArrayList(Connection).init(allocator),
-            .available = std.ArrayList(bool).init(allocator),
+            .connections = std.ArrayList(Connection){},
+            .available = std.ArrayList(bool){},
             .max_connections = max_connections,
             .current_connections = 0,
             .allocator = allocator,
@@ -378,8 +378,8 @@ pub const ConnectionPool = struct {
     }
 
     pub fn deinit(self: *ConnectionPool) void {
-        self.connections.deinit();
-        self.available.deinit();
+        self.connections.deinit(self.allocator);
+        self.available.deinit(self.allocator);
     }
 
     pub fn acquireConnection(self: *ConnectionPool, endpoint: []const u8) !?*Connection {
@@ -404,8 +404,8 @@ pub const ConnectionPool = struct {
                 .is_healthy = true,
             };
 
-            try self.connections.append(connection);
-            try self.available.append(false);
+            try self.connections.append(self.allocator, connection);
+            try self.available.append(self.allocator, false);
             self.current_connections += 1;
 
             return &self.connections.items[self.connections.items.len - 1];

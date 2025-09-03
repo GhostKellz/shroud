@@ -135,8 +135,8 @@ pub const MultiPartyAuthRequest = struct {
             .deadline = null,
             .created_at = std.time.milliTimestamp(),
             .status = .pending,
-            .signatures = std.ArrayList(AuthorizationSignature).init(allocator),
-            .participants = std.ArrayList(AuthorizationParticipant).init(allocator),
+            .signatures = std.ArrayList(AuthorizationSignature){},
+            .participants = std.ArrayList(AuthorizationParticipant){},
             .reason = "",
             .emergency_override = false,
             .allocator = allocator,
@@ -147,16 +147,16 @@ pub const MultiPartyAuthRequest = struct {
         for (self.signatures.items) |*sig| {
             sig.deinit();
         }
-        self.signatures.deinit();
-        self.participants.deinit();
+        self.signatures.deinit(self.allocator);
+        self.participants.deinit(self.allocator);
     }
 
     pub fn addParticipant(self: *MultiPartyAuthRequest, participant: AuthorizationParticipant) !void {
-        try self.participants.append(participant);
+        try self.participants.append(self.allocator, participant);
     }
 
     pub fn addSignature(self: *MultiPartyAuthRequest, signature: AuthorizationSignature) !void {
-        try self.signatures.append(signature);
+        try self.signatures.append(self.allocator, signature);
         self.updateStatus();
     }
 
@@ -262,31 +262,31 @@ pub const EmergencyRecoveryContext = struct {
         return EmergencyRecoveryContext{
             .recovery_id = recovery_id,
             .lost_identity_did = lost_identity_did,
-            .recovery_contacts = std.ArrayList(AuthorizationParticipant).init(allocator),
+            .recovery_contacts = std.ArrayList(AuthorizationParticipant){},
             .required_confirmations = 3, // Default 3-of-N recovery
             .recovery_method = method,
             .initiated_at = std.time.milliTimestamp(),
             .expires_at = std.time.milliTimestamp() + (7 * 24 * 60 * 60 * 1000), // 7 days
-            .confirmations = std.ArrayList(AuthorizationSignature).init(allocator),
+            .confirmations = std.ArrayList(AuthorizationSignature){},
             .new_identity_proposal = null,
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *EmergencyRecoveryContext) void {
-        self.recovery_contacts.deinit();
+        self.recovery_contacts.deinit(self.allocator);
         for (self.confirmations.items) |*confirmation| {
             confirmation.deinit();
         }
-        self.confirmations.deinit();
+        self.confirmations.deinit(self.allocator);
     }
 
     pub fn addRecoveryContact(self: *EmergencyRecoveryContext, contact: AuthorizationParticipant) !void {
-        try self.recovery_contacts.append(contact);
+        try self.recovery_contacts.append(self.allocator, contact);
     }
 
     pub fn addConfirmation(self: *EmergencyRecoveryContext, confirmation: AuthorizationSignature) !void {
-        try self.confirmations.append(confirmation);
+        try self.confirmations.append(self.allocator, confirmation);
     }
 
     pub fn isRecoveryApproved(self: *const EmergencyRecoveryContext) bool {
@@ -330,13 +330,13 @@ pub const MultiPartyAuthSystem = struct {
     pub fn deinit(self: *MultiPartyAuthSystem) void {
         var request_iter = self.active_requests.iterator();
         while (request_iter.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.active_requests.deinit();
 
         var recovery_iter = self.recovery_contexts.iterator();
         while (recovery_iter.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.recovery_contexts.deinit();
 
@@ -411,20 +411,20 @@ pub const MultiPartyAuthSystem = struct {
 
     /// Clean up expired requests
     pub fn cleanupExpiredRequests(self: *MultiPartyAuthSystem) !void {
-        var to_remove = std.ArrayList([]const u8).init(self.allocator);
-        defer to_remove.deinit();
+        var to_remove = std.ArrayList([]const u8){};
+        defer to_remove.deinit(self.allocator);
 
         var iterator = self.active_requests.iterator();
         while (iterator.next()) |entry| {
             if (entry.value_ptr.isExpired()) {
                 entry.value_ptr.status = .expired;
-                try to_remove.append(entry.key_ptr.*);
+                try to_remove.append(self.allocator, entry.key_ptr.*);
             }
         }
 
         for (to_remove.items) |request_id| {
             if (self.active_requests.fetchRemove(request_id)) |removed| {
-                removed.value.deinit();
+                removed.value.deinit(self.allocator);
             }
         }
     }

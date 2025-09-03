@@ -46,7 +46,7 @@ pub const DevicePolicy = struct {
 
     pub fn init(allocator: std.mem.Allocator) DevicePolicy {
         return DevicePolicy{
-            .allowed_devices = std.ArrayList(DeviceFingerprint).init(allocator),
+            .allowed_devices = std.ArrayList(DeviceFingerprint){},
             .require_device_binding = false,
             .allow_new_devices = true,
             .max_devices = null,
@@ -55,7 +55,7 @@ pub const DevicePolicy = struct {
     }
 
     pub fn deinit(self: *DevicePolicy) void {
-        self.allowed_devices.deinit();
+        self.allowed_devices.deinit(self.allocator);
     }
 
     pub fn addDevice(self: *DevicePolicy, device: DeviceFingerprint) !void {
@@ -64,7 +64,7 @@ pub const DevicePolicy = struct {
                 return error.TooManyDevices;
             }
         }
-        try self.allowed_devices.append(device);
+        try self.allowed_devices.append(self.allocator, device);
     }
 
     pub fn isDeviceAllowed(self: *const DevicePolicy, device: DeviceFingerprint) bool {
@@ -87,11 +87,11 @@ pub const DevicePolicy = struct {
 
 /// Generate device fingerprint from system characteristics
 pub fn generateDeviceFingerprint(allocator: std.mem.Allocator) !DeviceFingerprint {
-    var fingerprint_data = std.ArrayList(u8).init(allocator);
-    defer fingerprint_data.deinit();
+    var fingerprint_data = std.ArrayList(u8){};
+    defer fingerprint_data.deinit(allocator);
 
     // Add consistent prefix for versioning
-    try fingerprint_data.appendSlice("SHROUD-Device-v1");
+    try fingerprint_data.appendSlice(allocator, "SHROUD-Device-v1");
 
     // Platform-specific system info collection
     try collectSystemInfo(allocator, &fingerprint_data);
@@ -109,39 +109,39 @@ fn collectSystemInfo(allocator: std.mem.Allocator, data: *std.ArrayList(u8)) !vo
     // Hostname
     if (std.process.getEnvVarOwned(allocator, "HOSTNAME")) |hostname| {
         defer allocator.free(hostname);
-        try data.appendSlice(hostname);
+        try data.appendSlice(allocator, hostname);
     } else |_| {
         if (std.process.getEnvVarOwned(allocator, "COMPUTERNAME")) |computername| {
             defer allocator.free(computername);
-            try data.appendSlice(computername);
+            try data.appendSlice(allocator, computername);
         } else |_| {
-            try data.appendSlice("unknown-host");
+            try data.appendSlice(allocator, "unknown-host");
         }
     }
 
     // User info
     if (std.process.getEnvVarOwned(allocator, "USER")) |user| {
         defer allocator.free(user);
-        try data.appendSlice(user);
+        try data.appendSlice(allocator, user);
     } else |_| {
         if (std.process.getEnvVarOwned(allocator, "USERNAME")) |username| {
             defer allocator.free(username);
-            try data.appendSlice(username);
+            try data.appendSlice(allocator, username);
         } else |_| {
-            try data.appendSlice("unknown-user");
+            try data.appendSlice(allocator, "unknown-user");
         }
     }
 
     // Home directory
     if (std.process.getEnvVarOwned(allocator, "HOME")) |home| {
         defer allocator.free(home);
-        try data.appendSlice(home);
+        try data.appendSlice(allocator, home);
     } else |_| {
         if (std.process.getEnvVarOwned(allocator, "USERPROFILE")) |userprofile| {
             defer allocator.free(userprofile);
-            try data.appendSlice(userprofile);
+            try data.appendSlice(allocator, userprofile);
         } else |_| {
-            try data.appendSlice("unknown-home");
+            try data.appendSlice(allocator, "unknown-home");
         }
     }
 
@@ -153,7 +153,7 @@ fn collectSystemInfo(allocator: std.mem.Allocator, data: *std.ArrayList(u8)) !vo
         .freebsd => "freebsd",
         else => "unknown",
     };
-    try data.appendSlice(platform);
+    try data.appendSlice(allocator, platform);
 
     // Architecture
     const arch = switch (@import("builtin").target.cpu.arch) {
@@ -162,7 +162,7 @@ fn collectSystemInfo(allocator: std.mem.Allocator, data: *std.ArrayList(u8)) !vo
         .arm => "arm",
         else => "unknown",
     };
-    try data.appendSlice(arch);
+    try data.appendSlice(allocator, arch);
 }
 
 /// Identity bound to a specific device

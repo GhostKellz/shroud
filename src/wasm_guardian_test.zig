@@ -17,9 +17,9 @@ test "WasmPolicyEngine basic functionality" {
     try engine.loadPolicy("default", default_policy);
     
     // Create access context
-    var context = guardian.AccessContext.init(allocator, "admin", "test_resource", .read);
-    defer context.deinit();
-    try context.addRole("admin");
+    var context = guardian.AccessContext.init("admin", "test_resource", .read);
+    defer context.deinit(allocator);
+    try context.addRole(allocator, "admin");
     
     // Evaluate policy
     const result = try engine.evaluatePolicy("default", &context);
@@ -37,9 +37,9 @@ test "WasmGuardian with fallback" {
     try wasm_guardian_instance.addRole("admin", &[_]guardian.Permission{ .read, .write, .admin });
     
     // Test fallback guardian functionality
-    var context = guardian.AccessContext.init(allocator, "alice", "document1", .read);
-    defer context.deinit();
-    try context.addRole("user");
+    var context = guardian.AccessContext.init("alice", "document1", .read);
+    defer context.deinit(allocator);
+    try context.addRole(allocator, "user");
     
     // Should use fallback since no WASM policy specified
     const result = try wasm_guardian_instance.canAccess(&context, null);
@@ -61,8 +61,8 @@ test "WasmPolicy creation and evaluation" {
     defer policy.deinit();
     
     // Create context for evaluation
-    var context = guardian.AccessContext.init(allocator, "testuser", "resource", .read);
-    defer context.deinit();
+    var context = guardian.AccessContext.init("testuser", "resource", .read);
+    defer context.deinit(allocator);
     
     // Policy evaluation should work
     const result = try policy.evaluate(&context);
@@ -123,23 +123,23 @@ test "WasmPolicy parameter validation" {
     try runtime.loadModule(&wasm_module);
     
     // Create serialized parameters for admin user
-    var params = std.ArrayList(u8).init(allocator);
-    defer params.deinit();
+    var params = std.ArrayList(u8){};
+    defer params.deinit(allocator);
     
     const admin_id = "admin";
-    try params.append(@intCast(admin_id.len));
-    try params.appendSlice(admin_id);
-    try params.append(0); // roles count
+    try params.append(allocator, @intCast(admin_id.len));
+    try params.appendSlice(allocator, admin_id);
+    try params.append(allocator, 0); // roles count
     
     // Add timestamp, resource, operation
     var timestamp_bytes: [8]u8 = undefined;
     std.mem.writeInt(u64, &timestamp_bytes, @intCast(std.time.timestamp()), .little);
-    try params.appendSlice(&timestamp_bytes);
+    try params.appendSlice(allocator, &timestamp_bytes);
     
     const resource = "test";
-    try params.append(@intCast(resource.len));
-    try params.appendSlice(resource);
-    try params.append(@intFromEnum(guardian.Permission.read));
+    try params.append(allocator, @intCast(resource.len));
+    try params.appendSlice(allocator, resource);
+    try params.append(allocator, @intFromEnum(guardian.Permission.read));
     
     // Should return 1 for admin user
     const result = try runtime.callFunction("evaluate", params.items);
@@ -172,21 +172,21 @@ test "WasmPolicy permission validation function" {
     try runtime.loadModule(&wasm_module);
     
     // Create parameters for permission check
-    var params = std.ArrayList(u8).init(allocator);
-    defer params.deinit();
+    var params = std.ArrayList(u8){};
+    defer params.deinit(allocator);
     
     // Identity: "admin"
     const identity = "admin";
-    try params.append(@intCast(identity.len));
-    try params.appendSlice(identity);
+    try params.append(allocator, @intCast(identity.len));
+    try params.appendSlice(allocator, identity);
     
     // Resource: "admin_panel"
     const resource = "admin_panel";
-    try params.append(@intCast(resource.len));
-    try params.appendSlice(resource);
+    try params.append(allocator, @intCast(resource.len));
+    try params.appendSlice(allocator, resource);
     
     // Permission: write
-    try params.append(@intFromEnum(guardian.Permission.write));
+    try params.append(allocator, @intFromEnum(guardian.Permission.write));
     
     // Should return 1 for admin user with write permission
     const result = try runtime.callFunction("validate_permission", params.items);

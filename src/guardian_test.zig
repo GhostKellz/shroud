@@ -20,10 +20,10 @@ test "guardian access control" {
     
     try guardian.createBasicRoles(&g);
     
-    var context = guardian.AccessContext.init(testing.allocator, "user123", "/api/data", .read);
-    defer context.deinit();
+    var context = guardian.AccessContext.init("user123", "/api/data", .read);
+    defer context.deinit(testing.allocator);
     
-    try context.addRole("user");
+    try context.addRole(testing.allocator, "user");
     
     const allowed = try g.canAccess(&context);
     try testing.expect(allowed);
@@ -35,10 +35,10 @@ test "guardian admin permissions" {
     
     try guardian.createBasicRoles(&g);
     
-    var context = guardian.AccessContext.init(testing.allocator, "admin123", "/admin/config", .admin);
-    defer context.deinit();
+    var context = guardian.AccessContext.init("admin123", "/admin/config", .admin);
+    defer context.deinit(testing.allocator);
     
-    try context.addRole("admin");
+    try context.addRole(testing.allocator, "admin");
     
     const allowed = try g.canAccess(&context);
     try testing.expect(allowed);
@@ -50,10 +50,10 @@ test "guardian access denied" {
     
     try guardian.createBasicRoles(&g);
     
-    var context = guardian.AccessContext.init(testing.allocator, "user123", "/admin/config", .admin);
-    defer context.deinit();
+    var context = guardian.AccessContext.init("user123", "/admin/config", .admin);
+    defer context.deinit(testing.allocator);
     
-    try context.addRole("user");
+    try context.addRole(testing.allocator, "user");
     
     const allowed = try g.canAccess(&context);
     try testing.expect(!allowed);

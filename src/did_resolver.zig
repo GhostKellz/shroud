@@ -32,13 +32,13 @@ pub const DIDDocument = struct {
                 .id = id,
                 .type = key_type,
                 .public_key_base58 = public_key,
-                .purposes = std.ArrayList(KeyPurpose).init(allocator),
+                .purposes = std.ArrayList(KeyPurpose){},
                 .allocator = allocator,
             };
         }
 
         pub fn deinit(self: *PublicKeyEntry) void {
-            self.purposes.deinit();
+            self.purposes.deinit(self.allocator);
         }
     };
 
@@ -66,10 +66,10 @@ pub const DIDDocument = struct {
     pub fn init(allocator: std.mem.Allocator, id: []const u8) DIDDocument {
         return DIDDocument{
             .id = id,
-            .public_keys = std.ArrayList(PublicKeyEntry).init(allocator),
-            .services = std.ArrayList(ServiceEntry).init(allocator),
-            .authentication = std.ArrayList([]const u8).init(allocator),
-            .assertion_method = std.ArrayList([]const u8).init(allocator),
+            .public_keys = std.ArrayList(PublicKeyEntry){},
+            .services = std.ArrayList(ServiceEntry){},
+            .authentication = std.ArrayList([]const u8){},
+            .assertion_method = std.ArrayList([]const u8){},
             .created = std.time.milliTimestamp(),
             .updated = std.time.milliTimestamp(),
             .version = 1,
@@ -81,18 +81,18 @@ pub const DIDDocument = struct {
         for (self.public_keys.items) |*key| {
             key.deinit();
         }
-        self.public_keys.deinit();
-        self.services.deinit();
-        self.authentication.deinit();
-        self.assertion_method.deinit();
+        self.public_keys.deinit(self.allocator);
+        self.services.deinit(self.allocator);
+        self.authentication.deinit(self.allocator);
+        self.assertion_method.deinit(self.allocator);
     }
 
     pub fn addPublicKey(self: *DIDDocument, key: PublicKeyEntry) !void {
-        try self.public_keys.append(key);
+        try self.public_keys.append(self.allocator, key);
     }
 
     pub fn addService(self: *DIDDocument, service: ServiceEntry) !void {
-        try self.services.append(service);
+        try self.services.append(self.allocator, service);
     }
 
     pub fn getPublicKey(self: *const DIDDocument, key_id: []const u8) ?*const PublicKeyEntry {
@@ -167,7 +167,7 @@ pub const BatchResolutionResponse = struct {
 
     pub fn init(allocator: std.mem.Allocator) BatchResolutionResponse {
         return BatchResolutionResponse{
-            .results = std.ArrayList(ResolutionResult).init(allocator),
+            .results = std.ArrayList(ResolutionResult){},
             .metadata = ResolutionMetadata{
                 .total_requested = 0,
                 .successful = 0,
@@ -185,7 +185,7 @@ pub const BatchResolutionResponse = struct {
                 doc.deinit();
             }
         }
-        self.results.deinit();
+        self.results.deinit(self.allocator);
     }
 };
 
@@ -306,7 +306,7 @@ pub const DIDResolver = struct {
                 response.metadata.failed += 1;
             }
 
-            try response.results.append(result);
+            try response.results.append(self.allocator, result);
         }
 
         response.metadata.total_time_ms = @intCast(std.time.milliTimestamp() - start_time);
@@ -419,13 +419,13 @@ pub const DIDResolver = struct {
 
     /// Clear expired entries from cache
     pub fn cleanCache(self: *DIDResolver) void {
-        var to_remove = std.ArrayList([]const u8).init(self.allocator);
-        defer to_remove.deinit();
+        var to_remove = std.ArrayList([]const u8){};
+        defer to_remove.deinit(self.allocator);
 
         var iterator = self.cache.iterator();
         while (iterator.next()) |entry| {
             if (entry.value_ptr.isExpired()) {
-                to_remove.append(entry.key_ptr.*) catch continue;
+                to_remove.append(self.allocator, entry.key_ptr.*) catch continue;
             }
         }
 
@@ -484,14 +484,14 @@ pub const DIDResolver = struct {
 
         // Create a sample key entry
         var key = DIDDocument.PublicKeyEntry.init(self.allocator, "key-1", .ed25519, "sample-public-key-base58");
-        try key.purposes.append(.authentication);
-        try key.purposes.append(.assertion_method);
+        try key.purposes.append(key.allocator, .authentication);
+        try key.purposes.append(key.allocator, .assertion_method);
 
         try document.addPublicKey(key);
 
         // Add authentication reference
-        try document.authentication.append("key-1");
-        try document.assertion_method.append("key-1");
+        try document.authentication.append(document.allocator, "key-1");
+        try document.assertion_method.append(document.allocator, "key-1");
 
         return document;
     }
@@ -503,10 +503,10 @@ pub const DIDResolver = struct {
         // Extract public key from DID (simplified)
         var key = DIDDocument.PublicKeyEntry.init(self.allocator, "key-1", .ed25519, did[8..] // Skip "did:key:" prefix
         );
-        try key.purposes.append(.authentication);
+        try key.purposes.append(key.allocator, .authentication);
 
         try document.addPublicKey(key);
-        try document.authentication.append("key-1");
+        try document.authentication.append(document.allocator, "key-1");
 
         return document;
     }
@@ -635,13 +635,13 @@ pub const TransactionContext = struct {
             .target_did = null,
             .timestamp = std.time.milliTimestamp(),
             .risk_score = 0.0,
-            .compliance_flags = std.ArrayList(ComplianceFlag).init(allocator),
+            .compliance_flags = std.ArrayList(ComplianceFlag){},
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *TransactionContext) void {
-        self.compliance_flags.deinit();
+        self.compliance_flags.deinit(self.allocator);
     }
 
     pub fn setAmount(self: *TransactionContext, amount: u64, currency: []const u8) void {
@@ -654,7 +654,7 @@ pub const TransactionContext = struct {
     }
 
     pub fn addComplianceFlag(self: *TransactionContext, flag: ComplianceFlag) !void {
-        try self.compliance_flags.append(flag);
+        try self.compliance_flags.append(self.allocator, flag);
 
         // Update risk score based on flag severity
         const severity_weight: f32 = switch (flag.severity) {
@@ -692,15 +692,15 @@ pub const TransactionAwareBatchResolutionRequest = struct {
         return TransactionAwareBatchResolutionRequest{
             .base_request = base_request,
             .transaction_context = null,
-            .policy_requirements = std.ArrayList([]const u8).init(allocator),
-            .authorization_tokens = std.ArrayList([]const u8).init(allocator),
+            .policy_requirements = std.ArrayList([]const u8){},
+            .authorization_tokens = std.ArrayList([]const u8){},
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *TransactionAwareBatchResolutionRequest) void {
-        self.policy_requirements.deinit();
-        self.authorization_tokens.deinit();
+        self.policy_requirements.deinit(self.allocator);
+        self.authorization_tokens.deinit(self.allocator);
     }
 
     pub fn setTransactionContext(self: *TransactionAwareBatchResolutionRequest, context: *const TransactionContext) void {
@@ -708,11 +708,11 @@ pub const TransactionAwareBatchResolutionRequest = struct {
     }
 
     pub fn addPolicyRequirement(self: *TransactionAwareBatchResolutionRequest, policy: []const u8) !void {
-        try self.policy_requirements.append(policy);
+        try self.policy_requirements.append(self.allocator, policy);
     }
 
     pub fn addAuthorizationToken(self: *TransactionAwareBatchResolutionRequest, token: []const u8) !void {
-        try self.authorization_tokens.append(token);
+        try self.authorization_tokens.append(self.allocator, token);
     }
 };
 
@@ -721,7 +721,7 @@ test "DID document creation and management" {
     defer document.deinit();
 
     var key = DIDDocument.PublicKeyEntry.init(std.testing.allocator, "key-1", .ed25519, "test-public-key");
-    try key.purposes.append(.authentication);
+    try key.purposes.append(key.allocator, .authentication);
     try document.addPublicKey(key);
 
     try std.testing.expect(document.public_keys.items.len == 1);
@@ -807,9 +807,9 @@ test "transaction-aware DID resolution" {
     defer resolver.deinit();
 
     // Create base batch request
-    var did_list = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer did_list.deinit();
-    try did_list.append("did:shroud:test");
+    var did_list = std.ArrayList([]const u8){};
+    defer did_list.deinit(std.testing.allocator);
+    try did_list.append(std.testing.allocator, "did:shroud:test");
 
     const base_request = BatchResolutionRequest{
         .dids = did_list.items,

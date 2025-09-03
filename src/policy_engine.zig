@@ -54,8 +54,8 @@ pub const PolicyTemplate = struct {
         return PolicyTemplate{
             .name = name,
             .description = description,
-            .permissions = std.ArrayList(TemplatePermission).init(allocator),
-            .conditions = std.ArrayList(TemplateCondition).init(allocator),
+            .permissions = std.ArrayList(TemplatePermission){},
+            .conditions = std.ArrayList(TemplateCondition){},
             .parameters = std.HashMap([]const u8, ParameterDefinition, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .version = version,
             .allocator = allocator,
@@ -63,17 +63,17 @@ pub const PolicyTemplate = struct {
     }
 
     pub fn deinit(self: *PolicyTemplate) void {
-        self.permissions.deinit();
-        self.conditions.deinit();
+        self.permissions.deinit(self.allocator);
+        self.conditions.deinit(self.allocator);
         self.parameters.deinit();
     }
 
     pub fn addPermission(self: *PolicyTemplate, permission: TemplatePermission) !void {
-        try self.permissions.append(permission);
+        try self.permissions.append(self.allocator, permission);
     }
 
     pub fn addCondition(self: *PolicyTemplate, condition: TemplateCondition) !void {
-        try self.conditions.append(condition);
+        try self.conditions.append(self.allocator, condition);
     }
 
     pub fn addParameter(self: *PolicyTemplate, name: []const u8, param: ParameterDefinition) !void {
@@ -106,8 +106,8 @@ pub const PolicyTemplate = struct {
     }
 
     fn resolveParameters(self: *const PolicyTemplate, pattern: []const u8, params: std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage)) ![]u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
-        defer result.deinit();
+        var result = std.ArrayList(u8){};
+        defer result.deinit(self.allocator);
 
         var i: usize = 0;
         while (i < pattern.len) {
@@ -121,12 +121,12 @@ pub const PolicyTemplate = struct {
                 if (param_end < pattern.len) {
                     const param_name = pattern[i + 1 .. param_end];
                     if (params.get(param_name)) |value| {
-                        try result.appendSlice(value);
+                        try result.appendSlice(self.allocator, value);
                     } else {
                         // Check for default value
                         if (self.parameters.get(param_name)) |param_def| {
                             if (param_def.default_value) |default| {
-                                try result.appendSlice(default);
+                                try result.appendSlice(self.allocator, default);
                             } else {
                                 return error.MissingRequiredParameter;
                             }
@@ -138,7 +138,7 @@ pub const PolicyTemplate = struct {
                     continue;
                 }
             }
-            try result.append(pattern[i]);
+            try result.append(self.allocator, pattern[i]);
             i += 1;
         }
 
@@ -204,9 +204,9 @@ pub const Policy = struct {
         return Policy{
             .name = name,
             .description = description,
-            .permissions = std.ArrayList(PolicyPermission).init(allocator),
-            .conditions = std.ArrayList(PolicyCondition).init(allocator),
-            .conflicts = std.ArrayList(PolicyConflict).init(allocator),
+            .permissions = std.ArrayList(PolicyPermission){},
+            .conditions = std.ArrayList(PolicyCondition){},
+            .conflicts = std.ArrayList(PolicyConflict){},
             .version = 1,
             .created_at = std.time.milliTimestamp(),
             .updated_at = std.time.milliTimestamp(),
@@ -218,23 +218,23 @@ pub const Policy = struct {
         for (self.permissions.items) |*perm| {
             perm.permission.deinit();
         }
-        self.permissions.deinit();
-        self.conditions.deinit();
-        self.conflicts.deinit();
+        self.permissions.deinit(self.allocator);
+        self.conditions.deinit(self.allocator);
+        self.conflicts.deinit(self.allocator);
     }
 
     pub fn addPermission(self: *Policy, permission: PolicyPermission) !void {
-        try self.permissions.append(permission);
+        try self.permissions.append(self.allocator, permission);
         self.updated_at = std.time.milliTimestamp();
     }
 
     pub fn addCondition(self: *Policy, condition: PolicyCondition) !void {
-        try self.conditions.append(condition);
+        try self.conditions.append(self.allocator, condition);
         self.updated_at = std.time.milliTimestamp();
     }
 
     pub fn addConflict(self: *Policy, conflict: PolicyConflict) !void {
-        try self.conflicts.append(conflict);
+        try self.conflicts.append(self.allocator, conflict);
     }
 
     /// Evaluate policy against context
@@ -321,15 +321,15 @@ pub const PolicyEvaluationResult = struct {
         return PolicyEvaluationResult{
             .decision = .deny,
             .reason = "",
-            .applied_policies = std.ArrayList([]const u8).init(allocator),
-            .conflicts_detected = std.ArrayList(Policy.PolicyConflict).init(allocator),
+            .applied_policies = std.ArrayList([]const u8){},
+            .conflicts_detected = std.ArrayList(Policy.PolicyConflict){},
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *PolicyEvaluationResult) void {
-        self.applied_policies.deinit();
-        self.conflicts_detected.deinit();
+        self.applied_policies.deinit(self.allocator);
+        self.conflicts_detected.deinit(self.allocator);
     }
 };
 
@@ -375,19 +375,19 @@ pub const PolicyEngine = struct {
 
     /// Evaluate multiple policies for a permission request
     pub fn evaluatePermission(self: *PolicyEngine, context: *const advanced_tokens.PermissionContext, permission: *const advanced_tokens.HierarchicalPermission, applicable_policies: []const []const u8) !PolicyEvaluationResult {
-        var results = std.ArrayList(PolicyEvaluationResult).init(self.allocator);
+        var results = std.ArrayList(PolicyEvaluationResult){};
         defer {
             for (results.items) |*result| {
                 result.deinit();
             }
-            results.deinit();
+            results.deinit(self.allocator);
         }
 
         // Evaluate each applicable policy
         for (applicable_policies) |policy_name| {
             if (self.policies.get(policy_name)) |*policy| {
                 const result = policy.evaluate(context, permission);
-                try results.append(result);
+                try results.append(self.allocator, result);
             }
         }
 

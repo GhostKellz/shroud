@@ -46,7 +46,7 @@ pub const ZkWitness = struct {
     
     pub fn init(allocator: std.mem.Allocator, identity_data: []const u8) ZkWitness {
         return ZkWitness{
-            .private_inputs = std.ArrayList([]const u8).init(allocator),
+            .private_inputs = std.ArrayList([]const u8){},
             .secret_key = std.mem.zeroes([32]u8),
             .identity_data = identity_data,
             .allocator = allocator,
@@ -54,11 +54,11 @@ pub const ZkWitness = struct {
     }
     
     pub fn deinit(self: *ZkWitness) void {
-        self.private_inputs.deinit();
+        self.private_inputs.deinit(self.allocator);
     }
     
     pub fn addPrivateInput(self: *ZkWitness, input: []const u8) !void {
-        try self.private_inputs.append(input);
+        try self.private_inputs.append(self.allocator, input);
     }
     
     pub fn setSecretKey(self: *ZkWitness, key: [32]u8) void {
@@ -132,19 +132,19 @@ pub const ZkAttestation = struct {
     }
     
     pub fn sign(self: *ZkAttestation, private_key: access_token.PrivateKey) !void {
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        try payload.appendSlice(self.identity_id);
-        try payload.appendSlice(self.proof.proof_data);
+        try payload.appendSlice(self.allocator, self.identity_id);
+        try payload.appendSlice(self.allocator, self.proof.proof_data);
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        try payload.appendSlice(&issued_bytes);
+        try payload.appendSlice(self.allocator, &issued_bytes);
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        try payload.appendSlice(&expires_bytes);
+        try payload.appendSlice(self.allocator, &expires_bytes);
         
         self.signature = try access_token.signData(payload.items, private_key);
     }
@@ -152,19 +152,19 @@ pub const ZkAttestation = struct {
     pub fn verify(self: *const ZkAttestation, public_key: access_token.PublicKey) bool {
         if (self.isExpired()) return false;
         
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        payload.appendSlice(self.identity_id) catch return false;
-        payload.appendSlice(self.proof.proof_data) catch return false;
+        payload.appendSlice(self.allocator, self.identity_id) catch return false;
+        payload.appendSlice(self.allocator, self.proof.proof_data) catch return false;
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        payload.appendSlice(&issued_bytes) catch return false;
+        payload.appendSlice(self.allocator, &issued_bytes) catch return false;
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        payload.appendSlice(&expires_bytes) catch return false;
+        payload.appendSlice(self.allocator, &expires_bytes) catch return false;
         
         return access_token.verifyData(self.signature, payload.items, public_key);
     }

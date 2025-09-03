@@ -69,24 +69,24 @@ pub const Identity = struct {
         return Identity{
             .id = id,
             .public_key = public_key,
-            .roles = std.ArrayList([]const u8).init(allocator),
+            .roles = std.ArrayList([]const u8){},
             .metadata = std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .delegations = std.ArrayList(Delegation).init(allocator),
+            .delegations = std.ArrayList(Delegation){},
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Identity) void {
-        self.roles.deinit();
+        self.roles.deinit(self.allocator);
         self.metadata.deinit();
         for (self.delegations.items) |*delegation| {
             delegation.deinit();
         }
-        self.delegations.deinit();
+        self.delegations.deinit(self.allocator);
     }
 
     pub fn addRole(self: *Identity, role: []const u8) !void {
-        try self.roles.append(role);
+        try self.roles.append(self.allocator, role);
     }
 
     pub fn hasRole(self: *const Identity, role: []const u8) bool {
@@ -105,7 +105,7 @@ pub const Identity = struct {
     }
 
     pub fn addDelegation(self: *Identity, delegation: Delegation) !void {
-        try self.delegations.append(delegation);
+        try self.delegations.append(self.allocator, delegation);
     }
 
     pub fn createAccessToken(self: *const Identity, expires_in_seconds: u64, private_key: access_token.PrivateKey) !access_token.AccessToken {
@@ -232,7 +232,7 @@ pub const Delegation = struct {
         return Delegation{
             .delegator = delegator,
             .delegate = delegate,
-            .permissions = std.ArrayList(guardian.Permission).init(allocator),
+            .permissions = std.ArrayList(guardian.Permission){},
             .resource_pattern = resource_pattern,
             .expires_at = now + expires_in_seconds,
             .signature = access_token.Signature{ .bytes = std.mem.zeroes([64]u8) },
@@ -241,11 +241,11 @@ pub const Delegation = struct {
     }
 
     pub fn deinit(self: *Delegation) void {
-        self.permissions.deinit();
+        self.permissions.deinit(self.allocator);
     }
 
     pub fn addPermission(self: *Delegation, permission: guardian.Permission) !void {
-        try self.permissions.append(permission);
+        try self.permissions.append(self.allocator, permission);
     }
 
     pub fn isExpired(self: *const Delegation) bool {
@@ -262,19 +262,19 @@ pub const Delegation = struct {
 
     pub fn sign(self: *Delegation, private_key: access_token.PrivateKey) !void {
         // Create delegation payload for signing
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
 
-        try payload.appendSlice(self.delegator);
-        try payload.appendSlice(self.delegate);
-        try payload.appendSlice(self.resource_pattern);
+        try payload.appendSlice(self.allocator, self.delegator);
+        try payload.appendSlice(self.allocator, self.delegate);
+        try payload.appendSlice(self.allocator, self.resource_pattern);
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        try payload.appendSlice(&expires_bytes);
+        try payload.appendSlice(self.allocator, &expires_bytes);
 
         // Add permissions to payload
         for (self.permissions.items) |perm| {
-            try payload.appendSlice(perm.toString());
+            try payload.appendSlice(self.allocator, perm.toString());
         }
 
         self.signature = try access_token.signData(payload.items, private_key);
@@ -282,19 +282,19 @@ pub const Delegation = struct {
 
     pub fn verify(self: *const Delegation, public_key: access_token.PublicKey) bool {
         // Recreate payload for verification
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
 
-        payload.appendSlice(self.delegator) catch return false;
-        payload.appendSlice(self.delegate) catch return false;
-        payload.appendSlice(self.resource_pattern) catch return false;
+        payload.appendSlice(self.allocator, self.delegator) catch return false;
+        payload.appendSlice(self.allocator, self.delegate) catch return false;
+        payload.appendSlice(self.allocator, self.resource_pattern) catch return false;
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        payload.appendSlice(&expires_bytes) catch return false;
+        payload.appendSlice(self.allocator, &expires_bytes) catch return false;
 
         // Add permissions to payload
         for (self.permissions.items) |perm| {
-            payload.appendSlice(perm.toString()) catch return false;
+            payload.appendSlice(self.allocator, perm.toString()) catch return false;
         }
 
         return access_token.verifyData(self.signature, payload.items, public_key);
@@ -353,12 +353,12 @@ pub const IdentityManager = struct {
 
     pub fn authorize(self: *IdentityManager, identity: *const Identity, resource: []const u8, permission: guardian.Permission) IdentityError!bool {
         // Create access context
-        var context = guardian.AccessContext.init(self.allocator, identity.id, resource, permission);
-        defer context.deinit();
+        var context = guardian.AccessContext.init(identity.id, resource, permission);
+        defer context.deinit(self.allocator);
 
         // Add identity roles to context
         for (identity.roles.items) |role| {
-            try context.addRole(role);
+            try context.addRole(self.allocator, role);
         }
 
         // Check direct permissions

@@ -32,19 +32,19 @@ pub const Role = struct {
     name: []const u8,
     permissions: std.ArrayList(Permission),
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8) Role {
+    pub fn init(name: []const u8) Role {
         return Role{
             .name = name,
-            .permissions = std.ArrayList(Permission).init(allocator),
+            .permissions = std.ArrayList(Permission){},
         };
     }
 
-    pub fn deinit(self: *Role) void {
-        self.permissions.deinit();
+    pub fn deinit(self: *Role, allocator: std.mem.Allocator) void {
+        self.permissions.deinit(allocator);
     }
 
-    pub fn addPermission(self: *Role, permission: Permission) !void {
-        try self.permissions.append(permission);
+    pub fn addPermission(self: *Role, allocator: std.mem.Allocator, permission: Permission) !void {
+        try self.permissions.append(allocator, permission);
     }
 
     pub fn hasPermission(self: *const Role, permission: Permission) bool {
@@ -62,22 +62,22 @@ pub const AccessContext = struct {
     resource_path: []const u8,
     operation: Permission,
 
-    pub fn init(allocator: std.mem.Allocator, user_id: []const u8, resource: []const u8, operation: Permission) AccessContext {
+    pub fn init(user_id: []const u8, resource: []const u8, operation: Permission) AccessContext {
         return AccessContext{
             .user_id = user_id,
-            .roles = std.ArrayList([]const u8).init(allocator),
+            .roles = std.ArrayList([]const u8){},
             .timestamp = @intCast(std.time.timestamp()),
             .resource_path = resource,
             .operation = operation,
         };
     }
 
-    pub fn deinit(self: *AccessContext) void {
-        self.roles.deinit();
+    pub fn deinit(self: *AccessContext, allocator: std.mem.Allocator) void {
+        self.roles.deinit(allocator);
     }
 
-    pub fn addRole(self: *AccessContext, role: []const u8) !void {
-        try self.roles.append(role);
+    pub fn addRole(self: *AccessContext, allocator: std.mem.Allocator, role: []const u8) !void {
+        try self.roles.append(allocator, role);
     }
 
     pub fn hasRole(self: *const AccessContext, role: []const u8) bool {
@@ -102,15 +102,15 @@ pub const Guardian = struct {
     pub fn deinit(self: *Guardian) void {
         var role_iter = self.roles.iterator();
         while (role_iter.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.roles.deinit();
     }
 
     pub fn addRole(self: *Guardian, name: []const u8, permissions: []const Permission) !void {
-        var role = Role.init(self.allocator, name);
+        var role = Role.init(name);
         for (permissions) |permission| {
-            try role.addPermission(permission);
+            try role.addPermission(self.allocator, permission);
         }
         try self.roles.put(name, role);
     }
@@ -145,7 +145,7 @@ pub const DeviceAccessContext = struct {
     pub fn init(allocator: std.mem.Allocator, user_id: []const u8, resource: []const u8, operation: Permission) DeviceAccessContext {
         return DeviceAccessContext{
             .user_id = user_id,
-            .roles = std.ArrayList([]const u8).init(allocator),
+            .roles = std.ArrayList([]const u8){},
             .resource_path = resource,
             .operation = operation,
             .device_fingerprint = null,
@@ -154,13 +154,13 @@ pub const DeviceAccessContext = struct {
         };
     }
 
-    pub fn deinit(self: *DeviceAccessContext) void {
-        self.roles.deinit();
+    pub fn deinit(self: *DeviceAccessContext, allocator: std.mem.Allocator) void {
+        self.roles.deinit(allocator);
         // Note: we don't own device_policy, so don't deinit it
     }
 
-    pub fn addRole(self: *DeviceAccessContext, role: []const u8) !void {
-        try self.roles.append(role);
+    pub fn addRole(self: *DeviceAccessContext, allocator: std.mem.Allocator, role: []const u8) !void {
+        try self.roles.append(allocator, role);
     }
 
     pub fn setDeviceFingerprint(self: *DeviceAccessContext, fingerprint: device.DeviceFingerprint) void {

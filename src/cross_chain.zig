@@ -93,8 +93,8 @@ pub const CrossChainIdentity = struct {
         return CrossChainIdentity{
             .primary_did = primary_did,
             .anchored_chains = std.HashMap(ChainType, ChainAnchor, std.hash_map.AutoContext(ChainType), std.hash_map.default_max_load_percentage).init(allocator),
-            .verifiable_credentials = std.ArrayList(VerifiableCredential).init(allocator),
-            .cross_chain_proofs = std.ArrayList(CrossChainProof).init(allocator),
+            .verifiable_credentials = std.ArrayList(VerifiableCredential){},
+            .cross_chain_proofs = std.ArrayList(CrossChainProof){},
             .allocator = allocator,
         };
     }
@@ -109,12 +109,12 @@ pub const CrossChainIdentity = struct {
         for (self.verifiable_credentials.items) |*cred| {
             cred.deinit();
         }
-        self.verifiable_credentials.deinit();
+        self.verifiable_credentials.deinit(self.allocator);
         
         for (self.cross_chain_proofs.items) |*proof| {
             proof.deinit();
         }
-        self.cross_chain_proofs.deinit();
+        self.cross_chain_proofs.deinit(self.allocator);
     }
     
     pub fn anchorToChain(self: *CrossChainIdentity, chain: ChainType, address: []const u8, proof: []const u8) !void {
@@ -123,7 +123,7 @@ pub const CrossChainIdentity = struct {
     }
     
     pub fn addVerifiableCredential(self: *CrossChainIdentity, credential: VerifiableCredential) !void {
-        try self.verifiable_credentials.append(credential);
+        try self.verifiable_credentials.append(self.allocator, credential);
     }
     
     pub fn createCrossChainProof(self: *CrossChainIdentity, target_chain: ChainType, proof_system: *zk_proof.ZkProofSystem) !CrossChainProof {
@@ -227,35 +227,35 @@ pub const VerifiableCredential = struct {
     }
     
     pub fn sign(self: *VerifiableCredential, private_key: access_token.PrivateKey) !void {
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        try payload.appendSlice(self.id);
+        try payload.appendSlice(self.allocator, self.id);
         
         const issuer_str = try self.issuer.toString(self.allocator);
         defer self.allocator.free(issuer_str);
-        try payload.appendSlice(issuer_str);
+        try payload.appendSlice(self.allocator, issuer_str);
         
         const subject_str = try self.subject.toString(self.allocator);
         defer self.allocator.free(subject_str);
-        try payload.appendSlice(subject_str);
+        try payload.appendSlice(self.allocator, subject_str);
         
-        try payload.appendSlice(self.credential_type);
+        try payload.appendSlice(self.allocator, self.credential_type);
         
         // Add claims
         var claim_iter = self.claims.iterator();
         while (claim_iter.next()) |entry| {
-            try payload.appendSlice(entry.key_ptr.*);
-            try payload.appendSlice(entry.value_ptr.*);
+            try payload.appendSlice(self.allocator, entry.key_ptr.*);
+            try payload.appendSlice(self.allocator, entry.value_ptr.*);
         }
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        try payload.appendSlice(&issued_bytes);
+        try payload.appendSlice(self.allocator, &issued_bytes);
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        try payload.appendSlice(&expires_bytes);
+        try payload.appendSlice(self.allocator, &expires_bytes);
         
         self.proof = try access_token.signData(payload.items, private_key);
     }
@@ -263,35 +263,35 @@ pub const VerifiableCredential = struct {
     pub fn verify(self: *const VerifiableCredential, public_key: access_token.PublicKey) bool {
         if (self.isExpired()) return false;
         
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        payload.appendSlice(self.id) catch return false;
+        payload.appendSlice(self.allocator, self.id) catch return false;
         
         const issuer_str = self.issuer.toString(self.allocator) catch return false;
         defer self.allocator.free(issuer_str);
-        payload.appendSlice(issuer_str) catch return false;
+        payload.appendSlice(self.allocator, issuer_str) catch return false;
         
         const subject_str = self.subject.toString(self.allocator) catch return false;
         defer self.allocator.free(subject_str);
-        payload.appendSlice(subject_str) catch return false;
+        payload.appendSlice(self.allocator, subject_str) catch return false;
         
-        payload.appendSlice(self.credential_type) catch return false;
+        payload.appendSlice(self.allocator, self.credential_type) catch return false;
         
         // Add claims
         var claim_iter = self.claims.iterator();
         while (claim_iter.next()) |entry| {
-            payload.appendSlice(entry.key_ptr.*) catch return false;
-            payload.appendSlice(entry.value_ptr.*) catch return false;
+            payload.appendSlice(self.allocator, entry.key_ptr.*) catch return false;
+            payload.appendSlice(self.allocator, entry.value_ptr.*) catch return false;
         }
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        payload.appendSlice(&issued_bytes) catch return false;
+        payload.appendSlice(self.allocator, &issued_bytes) catch return false;
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        payload.appendSlice(&expires_bytes) catch return false;
+        payload.appendSlice(self.allocator, &expires_bytes) catch return false;
         
         return access_token.verifyData(self.proof, payload.items, public_key);
     }
@@ -424,17 +424,17 @@ pub const ChainConfig = struct {
             .rpc_endpoint = rpc_endpoint,
             .contract_address = null,
             .network_id = network_id,
-            .supported_did_methods = std.ArrayList([]const u8).init(allocator),
+            .supported_did_methods = std.ArrayList([]const u8){},
             .allocator = allocator,
         };
     }
     
     pub fn deinit(self: *ChainConfig) void {
-        self.supported_did_methods.deinit();
+        self.supported_did_methods.deinit(self.allocator);
     }
     
     pub fn addDIDMethod(self: *ChainConfig, method: []const u8) !void {
-        try self.supported_did_methods.append(method);
+        try self.supported_did_methods.append(self.allocator, method);
     }
     
     pub fn setContractAddress(self: *ChainConfig, address: []const u8) void {

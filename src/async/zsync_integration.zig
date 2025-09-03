@@ -195,14 +195,14 @@ pub fn AsyncConnectionPool(comptime T: type) type {
 
         pub fn init(allocator: std.mem.Allocator, max_connections: usize) !Self {
             return Self{
-                .available = std.ArrayList(T).init(allocator),
+                .available = std.ArrayList(T){},
                 .max_connections = max_connections,
                 .mutex = std.Thread.Mutex{},
             };
         }
 
         pub fn deinit(self: *Self) void {
-            self.available.deinit();
+            self.available.deinit(self.allocator);
         }
 
         pub fn acquire(self: *Self) !T {
@@ -224,7 +224,7 @@ pub fn AsyncConnectionPool(comptime T: type) type {
                 return error.PoolFull;
             }
 
-            try self.available.append(connection);
+            try self.available.append(self.allocator, connection);
         }
 
         pub fn addConnection(self: *Self, connection: T) !void {
@@ -237,8 +237,8 @@ pub fn AsyncConnectionPool(comptime T: type) type {
 pub const AsyncCombinators = struct {
     /// Join multiple futures and wait for all to complete
     pub fn joinAll(comptime T: type, allocator: std.mem.Allocator, tasks: anytype) ![]T {
-        var task_ids = std.ArrayList(u32).init(allocator);
-        defer task_ids.deinit();
+        var task_ids = std.ArrayList(u32){};
+        defer task_ids.deinit(allocator);
 
         // Spawn all tasks and collect their IDs
         inline for (tasks) |task| {
@@ -249,7 +249,7 @@ pub const AsyncCombinators = struct {
             };
 
             const task_id = try zsync.spawn(TaskWrapper.wrapper, .{task});
-            try task_ids.append(task_id);
+            try task_ids.append(allocator, task_id);
         }
 
         // For now, just allocate results (in real implementation, we'd await all tasks)

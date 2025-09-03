@@ -46,8 +46,8 @@ pub const AccessToken = struct {
         const now = @as(u64, @intCast(std.time.timestamp()));
         return AccessToken{
             .user_id = user_id,
-            .roles = std.ArrayList([]const u8).init(allocator),
-            .permissions = std.ArrayList(guardian.Permission).init(allocator),
+            .roles = std.ArrayList([]const u8){},
+            .permissions = std.ArrayList(guardian.Permission){},
             .issued_at = now,
             .expires_at = now + expires_in_seconds,
             .signature = Signature{ .bytes = std.mem.zeroes([64]u8) },
@@ -56,16 +56,16 @@ pub const AccessToken = struct {
     }
     
     pub fn deinit(self: *AccessToken) void {
-        self.roles.deinit();
-        self.permissions.deinit();
+        self.roles.deinit(self.allocator);
+        self.permissions.deinit(self.allocator);
     }
     
     pub fn addRole(self: *AccessToken, role: []const u8) !void {
-        try self.roles.append(role);
+        try self.roles.append(self.allocator, role);
     }
     
     pub fn addPermission(self: *AccessToken, permission: guardian.Permission) !void {
-        try self.permissions.append(permission);
+        try self.permissions.append(self.allocator, permission);
     }
     
     pub fn isExpired(self: *const AccessToken) bool {
@@ -82,20 +82,20 @@ pub const AccessToken = struct {
     
     pub fn sign(self: *AccessToken, private_key: PrivateKey) TokenError!void {
         // Create token payload for signing
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        try payload.appendSlice(self.user_id);
+        try payload.appendSlice(self.allocator, self.user_id);
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        try payload.appendSlice(&issued_bytes);
+        try payload.appendSlice(self.allocator, &issued_bytes);
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        try payload.appendSlice(&expires_bytes);
+        try payload.appendSlice(self.allocator, &expires_bytes);
         
         // Add roles to payload
         for (self.roles.items) |role| {
-            try payload.appendSlice(role);
+            try payload.appendSlice(self.allocator, role);
         }
         
         // Use Ed25519 to sign
@@ -106,20 +106,20 @@ pub const AccessToken = struct {
     
     pub fn verify(self: *const AccessToken, public_key: PublicKey) bool {
         // Recreate payload for verification
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        payload.appendSlice(self.user_id) catch return false;
+        payload.appendSlice(self.allocator, self.user_id) catch return false;
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        payload.appendSlice(&issued_bytes) catch return false;
+        payload.appendSlice(self.allocator, &issued_bytes) catch return false;
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        payload.appendSlice(&expires_bytes) catch return false;
+        payload.appendSlice(self.allocator, &expires_bytes) catch return false;
         
         // Add roles to payload
         for (self.roles.items) |role| {
-            payload.appendSlice(role) catch return false;
+            payload.appendSlice(self.allocator, role) catch return false;
         }
         
         // Verify signature using Ed25519

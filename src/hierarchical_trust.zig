@@ -47,33 +47,33 @@ pub const DelegationScope = struct {
     
     pub fn init(allocator: std.mem.Allocator, max_depth: u8) DelegationScope {
         return DelegationScope{
-            .resource_patterns = std.ArrayList([]const u8).init(allocator),
-            .permissions = std.ArrayList(guardian.Permission).init(allocator),
-            .conditions = std.ArrayList(DelegationCondition).init(allocator),
+            .resource_patterns = std.ArrayList([]const u8){},
+            .permissions = std.ArrayList(guardian.Permission){},
+            .conditions = std.ArrayList(DelegationCondition){},
             .max_depth = max_depth,
             .allocator = allocator,
         };
     }
     
     pub fn deinit(self: *DelegationScope) void {
-        self.resource_patterns.deinit();
-        self.permissions.deinit();
+        self.resource_patterns.deinit(self.allocator);
+        self.permissions.deinit(self.allocator);
         for (self.conditions.items) |*condition| {
             condition.deinit();
         }
-        self.conditions.deinit();
+        self.conditions.deinit(self.allocator);
     }
     
     pub fn addResourcePattern(self: *DelegationScope, pattern: []const u8) !void {
-        try self.resource_patterns.append(pattern);
+        try self.resource_patterns.append(self.allocator, pattern);
     }
     
     pub fn addPermission(self: *DelegationScope, permission: guardian.Permission) !void {
-        try self.permissions.append(permission);
+        try self.permissions.append(self.allocator, permission);
     }
     
     pub fn addCondition(self: *DelegationScope, condition: DelegationCondition) !void {
-        try self.conditions.append(condition);
+        try self.conditions.append(self.allocator, condition);
     }
     
     pub fn matchesResource(self: *const DelegationScope, resource: []const u8) bool {
@@ -223,7 +223,7 @@ pub const HierarchicalDelegation = struct {
             .trust_level = trust_level,
             .scope = scope,
             .parent_delegation = null,
-            .child_delegations = std.ArrayList([]const u8).init(allocator),
+            .child_delegations = std.ArrayList([]const u8){},
             .depth = 0,
             .issued_at = now,
             .expires_at = now + expires_in_seconds,
@@ -235,14 +235,14 @@ pub const HierarchicalDelegation = struct {
     
     pub fn deinit(self: *HierarchicalDelegation) void {
         self.scope.deinit();
-        self.child_delegations.deinit();
+        self.child_delegations.deinit(self.allocator);
         if (self.zk_proof) |*proof| {
             proof.deinit();
         }
     }
     
     pub fn addChildDelegation(self: *HierarchicalDelegation, child_id: []const u8) !void {
-        try self.child_delegations.append(child_id);
+        try self.child_delegations.append(self.allocator, child_id);
     }
     
     pub fn setParent(self: *HierarchicalDelegation, parent_id: []const u8, parent_depth: u8) !void {
@@ -277,60 +277,60 @@ pub const HierarchicalDelegation = struct {
     }
     
     pub fn sign(self: *HierarchicalDelegation, private_key: access_token.PrivateKey) !void {
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        try payload.appendSlice(self.id);
-        try payload.appendSlice(self.delegator);
-        try payload.appendSlice(self.delegate);
-        try payload.append(@intFromEnum(self.trust_level));
-        try payload.append(self.depth);
+        try payload.appendSlice(self.allocator, self.id);
+        try payload.appendSlice(self.allocator, self.delegator);
+        try payload.appendSlice(self.allocator, self.delegate);
+        try payload.append(self.allocator, @intFromEnum(self.trust_level));
+        try payload.append(self.allocator, self.depth);
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        try payload.appendSlice(&issued_bytes);
+        try payload.appendSlice(self.allocator, &issued_bytes);
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        try payload.appendSlice(&expires_bytes);
+        try payload.appendSlice(self.allocator, &expires_bytes);
         
         // Add scope data
         for (self.scope.resource_patterns.items) |pattern| {
-            try payload.appendSlice(pattern);
+            try payload.appendSlice(self.allocator, pattern);
         }
         
         for (self.scope.permissions.items) |perm| {
-            try payload.append(@intFromEnum(perm));
+            try payload.append(self.allocator, @intFromEnum(perm));
         }
         
         self.signature = try access_token.signData(payload.items, private_key);
     }
     
     pub fn verify(self: *const HierarchicalDelegation, public_key: access_token.PublicKey) bool {
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
+        var payload = std.ArrayList(u8){};
+        defer payload.deinit(self.allocator);
         
-        payload.appendSlice(self.id) catch return false;
-        payload.appendSlice(self.delegator) catch return false;
-        payload.appendSlice(self.delegate) catch return false;
-        payload.append(@intFromEnum(self.trust_level)) catch return false;
-        payload.append(self.depth) catch return false;
+        payload.appendSlice(self.allocator, self.id) catch return false;
+        payload.appendSlice(self.allocator, self.delegator) catch return false;
+        payload.appendSlice(self.allocator, self.delegate) catch return false;
+        payload.append(self.allocator, @intFromEnum(self.trust_level)) catch return false;
+        payload.append(self.allocator, self.depth) catch return false;
         
         var issued_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &issued_bytes, self.issued_at, .little);
-        payload.appendSlice(&issued_bytes) catch return false;
+        payload.appendSlice(self.allocator, &issued_bytes) catch return false;
         
         var expires_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &expires_bytes, self.expires_at, .little);
-        payload.appendSlice(&expires_bytes) catch return false;
+        payload.appendSlice(self.allocator, &expires_bytes) catch return false;
         
         // Add scope data
         for (self.scope.resource_patterns.items) |pattern| {
-            payload.appendSlice(pattern) catch return false;
+            payload.appendSlice(self.allocator, pattern) catch return false;
         }
         
         for (self.scope.permissions.items) |perm| {
-            payload.append(@intFromEnum(perm)) catch return false;
+            payload.append(self.allocator, @intFromEnum(perm)) catch return false;
         }
         
         return access_token.verifyData(self.signature, payload.items, public_key);
@@ -413,7 +413,7 @@ pub const HierarchicalTrustManager = struct {
         return HierarchicalTrustManager{
             .delegations = std.HashMap([]const u8, HierarchicalDelegation, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .delegation_chains = std.HashMap([]const u8, std.ArrayList([]const u8), std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .trust_roots = std.ArrayList([]const u8).init(allocator),
+            .trust_roots = std.ArrayList([]const u8){},
             .max_delegation_depth = max_depth,
             .allocator = allocator,
         };
@@ -428,15 +428,15 @@ pub const HierarchicalTrustManager = struct {
         
         var chain_iter = self.delegation_chains.iterator();
         while (chain_iter.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.delegation_chains.deinit();
         
-        self.trust_roots.deinit();
+        self.trust_roots.deinit(self.allocator);
     }
     
     pub fn addTrustRoot(self: *HierarchicalTrustManager, root_identity: []const u8) !void {
-        try self.trust_roots.append(root_identity);
+        try self.trust_roots.append(self.allocator, root_identity);
     }
     
     pub fn createDelegation(self: *HierarchicalTrustManager, delegation: HierarchicalDelegation, parent_id: ?[]const u8) HierarchicalTrustError!void {
@@ -538,12 +538,12 @@ pub const HierarchicalTrustManager = struct {
     
     fn updateDelegationChain(self: *HierarchicalTrustManager, identity_id: []const u8, delegation_id: []const u8) !void {
         var chain = self.delegation_chains.get(identity_id) orelse blk: {
-            const new_chain = std.ArrayList([]const u8).init(self.allocator);
+            const new_chain = std.ArrayList([]const u8){};
             try self.delegation_chains.put(identity_id, new_chain);
             break :blk self.delegation_chains.getPtr(identity_id).?;
         };
         
-        try chain.append(delegation_id);
+        try chain.append(self.allocator, delegation_id);
     }
     
     fn removeDelegationFromChains(self: *HierarchicalTrustManager, delegation_id: []const u8) void {
@@ -586,17 +586,17 @@ pub const TrustMetrics = struct {
             .successful_operations = 0,
             .failed_operations = 0,
             .last_activity = @intCast(std.time.timestamp()),
-            .reputation_sources = std.ArrayList(ReputationSource).init(allocator),
+            .reputation_sources = std.ArrayList(ReputationSource){},
             .allocator = allocator,
         };
     }
     
     pub fn deinit(self: *TrustMetrics) void {
-        self.reputation_sources.deinit();
+        self.reputation_sources.deinit(self.allocator);
     }
     
     pub fn addReputationSource(self: *TrustMetrics, source: ReputationSource) !void {
-        try self.reputation_sources.append(source);
+        try self.reputation_sources.append(self.allocator, source);
         self.recalculateTrustScore();
     }
     

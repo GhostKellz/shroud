@@ -107,46 +107,46 @@ pub const WasmPolicy = struct {
     }
     
     fn serializeContext(self: *const WasmPolicy, context: *const guardian.AccessContext) ![]u8 {
-        var buffer = std.ArrayList(u8).init(self.allocator);
-        defer buffer.deinit();
+        var buffer = std.ArrayList(u8){};
+        defer buffer.deinit(self.allocator);
         
         // Serialize user_id length and data
-        try buffer.append(@intCast(context.user_id.len));
-        try buffer.appendSlice(context.user_id);
+        try buffer.append(self.allocator, @intCast(context.user_id.len));
+        try buffer.appendSlice(self.allocator, context.user_id);
         
         // Serialize roles count and data
-        try buffer.append(@intCast(context.roles.items.len));
+        try buffer.append(self.allocator, @intCast(context.roles.items.len));
         for (context.roles.items) |role| {
-            try buffer.append(@intCast(role.len));
-            try buffer.appendSlice(role);
+            try buffer.append(self.allocator, @intCast(role.len));
+            try buffer.appendSlice(self.allocator, role);
         }
         
         // Serialize timestamp
         var timestamp_bytes: [8]u8 = undefined;
         std.mem.writeInt(u64, &timestamp_bytes, context.timestamp, .little);
-        try buffer.appendSlice(&timestamp_bytes);
+        try buffer.appendSlice(self.allocator, &timestamp_bytes);
         
         // Serialize resource path
-        try buffer.append(@intCast(context.resource_path.len));
-        try buffer.appendSlice(context.resource_path);
+        try buffer.append(self.allocator, @intCast(context.resource_path.len));
+        try buffer.appendSlice(self.allocator, context.resource_path);
         
         // Serialize operation
-        try buffer.append(@intFromEnum(context.operation));
+        try buffer.append(self.allocator, @intFromEnum(context.operation));
         
         return buffer.toOwnedSlice();
     }
     
     fn serializePermissionCheck(self: *const WasmPolicy, identity_id: []const u8, resource: []const u8, permission: guardian.Permission) ![]u8 {
-        var buffer = std.ArrayList(u8).init(self.allocator);
-        defer buffer.deinit();
+        var buffer = std.ArrayList(u8){};
+        defer buffer.deinit(self.allocator);
         
-        try buffer.append(@intCast(identity_id.len));
-        try buffer.appendSlice(identity_id);
+        try buffer.append(self.allocator, @intCast(identity_id.len));
+        try buffer.appendSlice(self.allocator, identity_id);
         
-        try buffer.append(@intCast(resource.len));
-        try buffer.appendSlice(resource);
+        try buffer.append(self.allocator, @intCast(resource.len));
+        try buffer.appendSlice(self.allocator, resource);
         
-        try buffer.append(@intFromEnum(permission));
+        try buffer.append(self.allocator, @intFromEnum(permission));
         
         return buffer.toOwnedSlice();
     }

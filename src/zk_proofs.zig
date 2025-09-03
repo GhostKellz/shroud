@@ -82,7 +82,7 @@ pub const SelectiveDisclosureRequest = struct {
 
     pub fn init(allocator: std.mem.Allocator, verifier_did: []const u8, purpose: []const u8) SelectiveDisclosureRequest {
         return SelectiveDisclosureRequest{
-            .attributes_to_disclose = std.ArrayList([]const u8).init(allocator),
+            .attributes_to_disclose = std.ArrayList([]const u8){},
             .proof_purpose = purpose,
             .verifier_did = verifier_did,
             .challenge = &[_]u8{},
@@ -91,14 +91,14 @@ pub const SelectiveDisclosureRequest = struct {
     }
 
     pub fn deinit(self: *SelectiveDisclosureRequest) void {
-        self.attributes_to_disclose.deinit();
+        self.attributes_to_disclose.deinit(self.allocator);
         if (self.challenge.len > 0) {
             self.allocator.free(self.challenge);
         }
     }
 
     pub fn addAttribute(self: *SelectiveDisclosureRequest, attribute: []const u8) !void {
-        try self.attributes_to_disclose.append(attribute);
+        try self.attributes_to_disclose.append(self.allocator, attribute);
     }
 
     pub fn setChallenge(self: *SelectiveDisclosureRequest, challenge: []const u8) !void {
@@ -325,15 +325,15 @@ pub const ZKProofSystem = struct {
         var proof = ZKProof.init(self.allocator, .attribute_proof);
 
         // Create proof that includes only requested attributes
-        var disclosed_data = std.ArrayList(u8).init(self.allocator);
-        defer disclosed_data.deinit();
+        var disclosed_data = std.ArrayList(u8){};
+        defer disclosed_data.deinit(self.allocator);
 
         for (request.attributes_to_disclose.items) |attribute| {
             if (identity_claims.get(attribute)) |value| {
-                try disclosed_data.appendSlice(attribute);
-                try disclosed_data.append(':');
-                try disclosed_data.appendSlice(value);
-                try disclosed_data.append(';');
+                try disclosed_data.appendSlice(self.allocator, attribute);
+                try disclosed_data.append(self.allocator, ':');
+                try disclosed_data.appendSlice(self.allocator, value);
+                try disclosed_data.append(self.allocator, ';');
             }
         }
 

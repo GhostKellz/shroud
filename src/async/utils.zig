@@ -139,8 +139,8 @@ pub fn ConnectionPool(comptime T: type) type {
         ) !Self {
             return Self{
                 .allocator = allocator,
-                .connections = std.ArrayList(*T).init(allocator),
-                .available = std.ArrayList(bool).init(allocator),
+                .connections = std.ArrayList(*T){},
+                .available = std.ArrayList(bool){},
                 .mutex = std.Thread.Mutex{},
                 .factory = factory,
                 .destroyer = destroyer,
@@ -152,8 +152,8 @@ pub fn ConnectionPool(comptime T: type) type {
             for (self.connections.items) |conn| {
                 self.destroyer(conn);
             }
-            self.connections.deinit();
-            self.available.deinit();
+            self.connections.deinit(self.allocator);
+            self.available.deinit(self.allocator);
         }
 
         pub fn acquire(self: *Self) !*T {
@@ -171,8 +171,8 @@ pub fn ConnectionPool(comptime T: type) type {
             // Create new if under limit
             if (self.connections.items.len < self.max_size) {
                 const conn = try self.factory(self.allocator);
-                try self.connections.append(conn);
-                try self.available.append(false);
+                try self.connections.append(self.allocator, conn);
+                try self.available.append(self.allocator, false);
                 return conn;
             }
 
@@ -197,7 +197,7 @@ pub fn ConnectionPool(comptime T: type) type {
 pub const AsyncUtils = struct {
     /// Simple async delay using std.time
     pub fn delay(duration_ms: u64) void {
-        std.time.sleep(duration_ms * std.time.ns_per_ms);
+        std.Thread.sleep(duration_ms * std.time.ns_per_ms);
     }
 
     /// Retry with exponential backoff

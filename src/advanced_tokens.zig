@@ -11,11 +11,11 @@ pub const HierarchicalPermission = struct {
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, path_str: []const u8) !HierarchicalPermission {
-        var parts = std.ArrayList([]const u8).init(allocator);
+        var parts = std.ArrayList([]const u8){};
         var iterator = std.mem.splitSequence(u8, path_str, ".");
 
         while (iterator.next()) |part| {
-            try parts.append(try allocator.dupe(u8, part));
+            try parts.append(allocator, try allocator.dupe(u8, part));
         }
 
         return HierarchicalPermission{
@@ -130,18 +130,18 @@ pub const ConditionalPermission = struct {
     pub fn init(allocator: std.mem.Allocator, permission: HierarchicalPermission) ConditionalPermission {
         return ConditionalPermission{
             .base_permission = permission,
-            .conditions = std.ArrayList(Condition).init(allocator),
+            .conditions = std.ArrayList(Condition){},
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *ConditionalPermission) void {
         self.base_permission.deinit();
-        self.conditions.deinit();
+        self.conditions.deinit(self.allocator);
     }
 
     pub fn addCondition(self: *ConditionalPermission, condition: Condition) !void {
-        try self.conditions.append(condition);
+        try self.conditions.append(self.allocator, condition);
     }
 
     /// Evaluate if permission is granted given current context
@@ -236,8 +236,8 @@ pub const DelegationChain = struct {
             return DelegationLink{
                 .delegator = delegator,
                 .delegate = delegate,
-                .permissions = std.ArrayList(HierarchicalPermission).init(allocator),
-                .conditions = std.ArrayList(ConditionalPermission).init(allocator),
+                .permissions = std.ArrayList(HierarchicalPermission){},
+                .conditions = std.ArrayList(ConditionalPermission){},
                 .expires_at = expires_at,
                 .signature = access_token.Signature{ .bytes = std.mem.zeroes([64]u8) },
                 .allocator = allocator,
@@ -248,11 +248,11 @@ pub const DelegationChain = struct {
             for (self.permissions.items) |*perm| {
                 perm.deinit();
             }
-            self.permissions.deinit();
+            self.permissions.deinit(self.allocator);
             for (self.conditions.items) |*cond| {
                 cond.deinit();
             }
-            self.conditions.deinit();
+            self.conditions.deinit(self.allocator);
         }
 
         pub fn isExpired(self: *const DelegationLink) bool {
@@ -260,17 +260,17 @@ pub const DelegationChain = struct {
         }
 
         pub fn addPermission(self: *DelegationLink, permission: HierarchicalPermission) !void {
-            try self.permissions.append(permission);
+            try self.permissions.append(self.allocator, permission);
         }
 
         pub fn addConditionalPermission(self: *DelegationLink, condition: ConditionalPermission) !void {
-            try self.conditions.append(condition);
+            try self.conditions.append(self.allocator, condition);
         }
     };
 
     pub fn init(allocator: std.mem.Allocator, max_depth: u32) DelegationChain {
         return DelegationChain{
-            .links = std.ArrayList(DelegationLink).init(allocator),
+            .links = std.ArrayList(DelegationLink){},
             .max_depth = max_depth,
             .allocator = allocator,
         };
@@ -280,14 +280,14 @@ pub const DelegationChain = struct {
         for (self.links.items) |*link| {
             link.deinit();
         }
-        self.links.deinit();
+        self.links.deinit(self.allocator);
     }
 
     pub fn addLink(self: *DelegationChain, link: DelegationLink) !void {
         if (self.links.items.len >= self.max_depth) {
             return error.MaxDepthExceeded;
         }
-        try self.links.append(link);
+        try self.links.append(self.allocator, link);
     }
 
     /// Validate the entire delegation chain
@@ -354,11 +354,11 @@ pub const AdvancedAccessToken = struct {
     pub fn init(allocator: std.mem.Allocator, user_id: []const u8, expires_in_seconds: u64) AdvancedAccessToken {
         return AdvancedAccessToken{
             .base_token = access_token.AccessToken.init(allocator, user_id, expires_in_seconds),
-            .hierarchical_permissions = std.ArrayList(HierarchicalPermission).init(allocator),
-            .conditional_permissions = std.ArrayList(ConditionalPermission).init(allocator),
+            .hierarchical_permissions = std.ArrayList(HierarchicalPermission){},
+            .conditional_permissions = std.ArrayList(ConditionalPermission){},
             .delegation_chain = null,
             .refresh_token = null,
-            .scope_restrictions = std.ArrayList([]const u8).init(allocator),
+            .scope_restrictions = std.ArrayList([]const u8){},
             .allocator = allocator,
         };
     }
@@ -368,23 +368,23 @@ pub const AdvancedAccessToken = struct {
         for (self.hierarchical_permissions.items) |*perm| {
             perm.deinit();
         }
-        self.hierarchical_permissions.deinit();
+        self.hierarchical_permissions.deinit(self.allocator);
         for (self.conditional_permissions.items) |*cond| {
             cond.deinit();
         }
-        self.conditional_permissions.deinit();
+        self.conditional_permissions.deinit(self.allocator);
         if (self.delegation_chain) |*chain| {
             chain.deinit();
         }
-        self.scope_restrictions.deinit();
+        self.scope_restrictions.deinit(self.allocator);
     }
 
     pub fn addHierarchicalPermission(self: *AdvancedAccessToken, permission: HierarchicalPermission) !void {
-        try self.hierarchical_permissions.append(permission);
+        try self.hierarchical_permissions.append(self.allocator, permission);
     }
 
     pub fn addConditionalPermission(self: *AdvancedAccessToken, permission: ConditionalPermission) !void {
-        try self.conditional_permissions.append(permission);
+        try self.conditional_permissions.append(self.allocator, permission);
     }
 
     pub fn setDelegationChain(self: *AdvancedAccessToken, chain: DelegationChain) void {
@@ -392,7 +392,7 @@ pub const AdvancedAccessToken = struct {
     }
 
     pub fn addScopeRestriction(self: *AdvancedAccessToken, scope: []const u8) !void {
-        try self.scope_restrictions.append(scope);
+        try self.scope_restrictions.append(self.allocator, scope);
     }
 
     /// Check if token grants specific hierarchical permission
