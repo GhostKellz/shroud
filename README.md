@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icons/shroud.png" alt="Shroud Logo" width="200"/>
+</p>
+
 # 🕶️ Shroud
 
 > Identity & Privacy Layer for Zero-Trust Systems
