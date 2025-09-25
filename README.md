@@ -8,6 +8,14 @@
 
 **Shroud** is a modular identity and privacy framework designed for secure access control, anonymous delegation, and policy enforcement in decentralized environments.
 
+## DISCLAIMER
+
+⚠️ **EXPERIMENTAL LIBRARY - FOR LAB/PERSONAL USE** ⚠️
+
+This is an experimental library under active development. It is
+intended for research, learning, and personal projects. The API is subject
+to change!
+
 ---
 
 ## ✨ Features
