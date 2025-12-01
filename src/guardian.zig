@@ -66,7 +66,7 @@ pub const AccessContext = struct {
         return AccessContext{
             .user_id = user_id,
             .roles = std.ArrayList([]const u8){},
-            .timestamp = @intCast(std.time.timestamp()),
+            .timestamp = @intCast((std.posix.clock_gettime(.REALTIME) catch unreachable).sec),
             .resource_path = resource,
             .operation = operation,
         };

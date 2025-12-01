@@ -43,7 +43,7 @@ pub const AccessToken = struct {
     allocator: std.mem.Allocator,
     
     pub fn init(allocator: std.mem.Allocator, user_id: []const u8, expires_in_seconds: u64) AccessToken {
-        const now = @as(u64, @intCast(std.time.timestamp()));
+        const now = @as(u64, @intCast((std.posix.clock_gettime(.REALTIME) catch unreachable).sec));
         return AccessToken{
             .user_id = user_id,
             .roles = std.ArrayList([]const u8){},
@@ -69,7 +69,7 @@ pub const AccessToken = struct {
     }
     
     pub fn isExpired(self: *const AccessToken) bool {
-        const now = @as(u64, @intCast(std.time.timestamp()));
+        const now = @as(u64, @intCast((std.posix.clock_gettime(.REALTIME) catch unreachable).sec));
         return now > self.expires_at;
     }
     

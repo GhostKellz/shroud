@@ -228,7 +228,7 @@ pub const Delegation = struct {
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, delegator: []const u8, delegate: []const u8, resource_pattern: []const u8, expires_in_seconds: u64) Delegation {
-        const now = @as(u64, @intCast(std.time.timestamp()));
+        const now = @as(u64, @intCast((std.posix.clock_gettime(.REALTIME) catch unreachable).sec));
         return Delegation{
             .delegator = delegator,
             .delegate = delegate,
@@ -249,7 +249,7 @@ pub const Delegation = struct {
     }
 
     pub fn isExpired(self: *const Delegation) bool {
-        const now = @as(u64, @intCast(std.time.timestamp()));
+        const now = @as(u64, @intCast((std.posix.clock_gettime(.REALTIME) catch unreachable).sec));
         return now > self.expires_at;
     }
 
