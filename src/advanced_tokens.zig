@@ -4,6 +4,7 @@
 const std = @import("std");
 const access_token = @import("access_token.zig");
 const guardian = @import("guardian.zig");
+const time_utils = @import("time_utils.zig");
 
 /// Hierarchical permission structure (e.g., admin.ledger.read)
 pub const HierarchicalPermission = struct {
@@ -232,7 +233,7 @@ pub const DelegationChain = struct {
         allocator: std.mem.Allocator,
 
         pub fn init(allocator: std.mem.Allocator, delegator: []const u8, delegate: []const u8, expires_in_seconds: u64) DelegationLink {
-            const expires_at = std.time.milliTimestamp() + (@as(i64, @intCast(expires_in_seconds)) * 1000);
+            const expires_at = time_utils.milliTimestamp() + (@as(i64, @intCast(expires_in_seconds)) * 1000);
             return DelegationLink{
                 .delegator = delegator,
                 .delegate = delegate,
@@ -256,7 +257,7 @@ pub const DelegationChain = struct {
         }
 
         pub fn isExpired(self: *const DelegationLink) bool {
-            return std.time.milliTimestamp() > self.expires_at;
+            return time_utils.milliTimestamp() > self.expires_at;
         }
 
         pub fn addPermission(self: *DelegationLink, permission: HierarchicalPermission) !void {
@@ -497,7 +498,7 @@ test "conditional permission evaluation" {
 
     // Test context within limit
     const context_within = PermissionContext{
-        .timestamp = std.time.milliTimestamp(),
+        .timestamp = time_utils.milliTimestamp(),
         .transaction_amount = 500,
         .user_country = null,
         .device_type = null,
@@ -510,7 +511,7 @@ test "conditional permission evaluation" {
 
     // Test context exceeding limit
     const context_exceeding = PermissionContext{
-        .timestamp = std.time.milliTimestamp(),
+        .timestamp = time_utils.milliTimestamp(),
         .transaction_amount = 1500,
         .user_country = null,
         .device_type = null,
@@ -546,7 +547,7 @@ test "delegation chain validation" {
     defer check_perm.deinit();
 
     const context = PermissionContext{
-        .timestamp = std.time.milliTimestamp(),
+        .timestamp = time_utils.milliTimestamp(),
         .transaction_amount = 0,
         .user_country = null,
         .device_type = null,

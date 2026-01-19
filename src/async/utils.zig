@@ -2,6 +2,7 @@
 //! Core async utilities and patterns for zsync integration
 
 const std = @import("std");
+const time_utils = @import("../time_utils.zig");
 
 /// SHROUD Async Runtime - Central async coordination point
 pub const ShroudRuntime = struct {
@@ -46,7 +47,7 @@ pub const ShroudRuntime = struct {
         const task_info = TaskInfo{
             .id = task_id,
             .name = name,
-            .start_time = std.time.milliTimestamp(),
+            .start_time = time_utils.milliTimestamp(),
             .status = .pending,
         };
 

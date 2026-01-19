@@ -5,6 +5,7 @@ const std = @import("std");
 const did_resolver = @import("did_resolver.zig");
 const advanced_tokens = @import("advanced_tokens.zig");
 const policy_engine = @import("policy_engine.zig");
+const time_utils = @import("time_utils.zig");
 
 /// Performance metrics tracking
 pub const PerformanceMetrics = struct {
@@ -29,7 +30,7 @@ pub const PerformanceMetrics = struct {
             .error_rate = 0.0,
             .concurrent_operations = 0,
             .total_operations = 0,
-            .start_time = std.time.milliTimestamp(),
+            .start_time = time_utils.milliTimestamp(),
             .allocator = allocator,
         };
     }
@@ -42,7 +43,7 @@ pub const PerformanceMetrics = struct {
         self.average_resolution_time = (self.average_resolution_time * (1.0 - weight)) + (operation_time_ms * weight);
 
         // Update operations per second
-        const elapsed_seconds = @as(f64, @floatFromInt(std.time.milliTimestamp() - self.start_time)) / 1000.0;
+        const elapsed_seconds = @as(f64, @floatFromInt(time_utils.milliTimestamp() - self.start_time)) / 1000.0;
         if (elapsed_seconds > 0) {
             self.operations_per_second = @as(f64, @floatFromInt(self.total_operations)) / elapsed_seconds;
         }
@@ -128,8 +129,8 @@ pub const OptimizedCache = struct {
             .data = stored_data,
             .compressed = compressed,
             .access_count = 1,
-            .last_access = std.time.milliTimestamp(),
-            .created_at = std.time.milliTimestamp(),
+            .last_access = time_utils.milliTimestamp(),
+            .created_at = time_utils.milliTimestamp(),
         };
 
         try self.items.put(try self.allocator.dupe(u8, key), item);
@@ -139,7 +140,7 @@ pub const OptimizedCache = struct {
     pub fn get(self: *OptimizedCache, key: []const u8) ?[]const u8 {
         if (self.items.getPtr(key)) |item| {
             item.access_count += 1;
-            item.last_access = std.time.milliTimestamp();
+            item.last_access = time_utils.milliTimestamp();
             self.hit_count += 1;
 
             // Move to end of access order (most recently used)
@@ -238,7 +239,7 @@ pub const BatchOptimizer = struct {
             .pending_operations = std.ArrayList(BatchOperation){}
             .batch_size_limit = batch_size,
             .batch_timeout_ms = timeout_ms,
-            .last_flush = std.time.milliTimestamp(),
+            .last_flush = time_utils.milliTimestamp(),
             .allocator = allocator,
         };
     }
@@ -252,7 +253,7 @@ pub const BatchOptimizer = struct {
             .operation_type = op_type,
             .data = try self.allocator.dupe(u8, data),
             .callback = callback,
-            .timestamp = std.time.milliTimestamp(),
+            .timestamp = time_utils.milliTimestamp(),
         };
 
         try self.pending_operations.append(self.allocator, operation);
@@ -296,12 +297,12 @@ pub const BatchOptimizer = struct {
             self.allocator.free(op.data);
         }
         self.pending_operations.clearRetainingCapacity();
-        self.last_flush = std.time.milliTimestamp();
+        self.last_flush = time_utils.milliTimestamp();
     }
 
     fn shouldFlush(self: *const BatchOptimizer) bool {
         const size_limit_reached = self.pending_operations.items.len >= self.batch_size_limit;
-        const timeout_reached = (std.time.milliTimestamp() - self.last_flush) >= self.batch_timeout_ms;
+        const timeout_reached = (time_utils.milliTimestamp() - self.last_flush) >= self.batch_timeout_ms;
         return size_limit_reached or timeout_reached;
     }
 
@@ -387,7 +388,7 @@ pub const ConnectionPool = struct {
         for (self.connections.items, 0..) |*conn, i| {
             if (std.mem.eql(u8, conn.endpoint, endpoint) and self.available.items[i] and conn.is_healthy) {
                 self.available.items[i] = false;
-                conn.last_used = std.time.milliTimestamp();
+                conn.last_used = time_utils.milliTimestamp();
                 conn.usage_count += 1;
                 return conn;
             }
@@ -398,8 +399,8 @@ pub const ConnectionPool = struct {
             const connection = Connection{
                 .id = @intCast(self.connections.items.len),
                 .endpoint = try self.allocator.dupe(u8, endpoint),
-                .created_at = std.time.milliTimestamp(),
-                .last_used = std.time.milliTimestamp(),
+                .created_at = time_utils.milliTimestamp(),
+                .last_used = time_utils.milliTimestamp(),
                 .usage_count = 1,
                 .is_healthy = true,
             };
@@ -424,7 +425,7 @@ pub const ConnectionPool = struct {
     }
 
     pub fn healthCheck(self: *ConnectionPool) void {
-        const now = std.time.milliTimestamp();
+        const now = time_utils.milliTimestamp();
         const timeout_threshold = 30 * 60 * 1000; // 30 minutes
 
         for (self.connections.items) |*conn| {
@@ -462,13 +463,13 @@ pub const PerformanceManager = struct {
 
     /// Optimized DID resolution with caching and batching
     pub fn resolveDIDOptimized(self: *PerformanceManager, did: []const u8) !?[]const u8 {
-        const start_time = std.time.milliTimestamp();
+        const start_time = time_utils.milliTimestamp();
         self.metrics.incrementConcurrentOps();
         defer self.metrics.decrementConcurrentOps();
 
         // Check cache first
         if (self.cache.get(did)) |cached_result| {
-            const end_time = std.time.milliTimestamp();
+            const end_time = time_utils.milliTimestamp();
             self.metrics.updateOperationTime(@floatFromInt(end_time - start_time));
             return cached_result;
         }
@@ -480,7 +481,7 @@ pub const PerformanceManager = struct {
         const result = "resolved_did_document_data";
         try self.cache.put(did, result);
 
-        const end_time = std.time.milliTimestamp();
+        const end_time = time_utils.milliTimestamp();
         self.metrics.updateOperationTime(@floatFromInt(end_time - start_time));
         return result;
     }

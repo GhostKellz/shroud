@@ -5,6 +5,7 @@ const std = @import("std");
 const identity = @import("identity.zig");
 const advanced_tokens = @import("advanced_tokens.zig");
 const zk_proofs = @import("zk_proofs.zig");
+const time_utils = @import("time_utils.zig");
 
 /// Authorization participant information
 pub const AuthorizationParticipant = struct {
@@ -38,8 +39,8 @@ pub const AuthorizationParticipant = struct {
             .weight = weight,
             .public_key = public_key,
             .status = .active,
-            .joined_at = std.time.milliTimestamp(),
-            .last_activity = std.time.milliTimestamp(),
+            .joined_at = time_utils.milliTimestamp(),
+            .last_activity = time_utils.milliTimestamp(),
         };
     }
 
@@ -48,7 +49,7 @@ pub const AuthorizationParticipant = struct {
     }
 
     pub fn updateActivity(self: *AuthorizationParticipant) void {
-        self.last_activity = std.time.milliTimestamp();
+        self.last_activity = time_utils.milliTimestamp();
     }
 };
 
@@ -72,7 +73,7 @@ pub const AuthorizationSignature = struct {
         return AuthorizationSignature{
             .participant_did = participant_did,
             .signature = signature,
-            .signed_at = std.time.milliTimestamp(),
+            .signed_at = time_utils.milliTimestamp(),
             .signature_type = sig_type,
             .metadata = std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .allocator = allocator,
@@ -133,7 +134,7 @@ pub const MultiPartyAuthRequest = struct {
             .required_approvals = 2, // Default M-of-N: 2
             .required_weight = 100, // Default weight threshold
             .deadline = null,
-            .created_at = std.time.milliTimestamp(),
+            .created_at = time_utils.milliTimestamp(),
             .status = .pending,
             .signatures = std.ArrayList(AuthorizationSignature){},
             .participants = std.ArrayList(AuthorizationParticipant){},
@@ -161,7 +162,7 @@ pub const MultiPartyAuthRequest = struct {
     }
 
     pub fn setDeadline(self: *MultiPartyAuthRequest, hours_from_now: u32) void {
-        self.deadline = std.time.milliTimestamp() + (@as(i64, @intCast(hours_from_now)) * 60 * 60 * 1000);
+        self.deadline = time_utils.milliTimestamp() + (@as(i64, @intCast(hours_from_now)) * 60 * 60 * 1000);
     }
 
     pub fn setThreshold(self: *MultiPartyAuthRequest, required_approvals: u32, required_weight: u32) void {
@@ -171,7 +172,7 @@ pub const MultiPartyAuthRequest = struct {
 
     pub fn isExpired(self: *const MultiPartyAuthRequest) bool {
         if (self.deadline) |deadline| {
-            return std.time.milliTimestamp() > deadline;
+            return time_utils.milliTimestamp() > deadline;
         }
         return false;
     }
@@ -265,8 +266,8 @@ pub const EmergencyRecoveryContext = struct {
             .recovery_contacts = std.ArrayList(AuthorizationParticipant){},
             .required_confirmations = 3, // Default 3-of-N recovery
             .recovery_method = method,
-            .initiated_at = std.time.milliTimestamp(),
-            .expires_at = std.time.milliTimestamp() + (7 * 24 * 60 * 60 * 1000), // 7 days
+            .initiated_at = time_utils.milliTimestamp(),
+            .expires_at = time_utils.milliTimestamp() + (7 * 24 * 60 * 60 * 1000), // 7 days
             .confirmations = std.ArrayList(AuthorizationSignature){},
             .new_identity_proposal = null,
             .allocator = allocator,
@@ -303,7 +304,7 @@ pub const EmergencyRecoveryContext = struct {
     }
 
     pub fn isExpired(self: *const EmergencyRecoveryContext) bool {
-        return std.time.milliTimestamp() > self.expires_at;
+        return time_utils.milliTimestamp() > self.expires_at;
     }
 };
 

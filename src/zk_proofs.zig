@@ -4,6 +4,7 @@
 const std = @import("std");
 const identity = @import("identity.zig");
 const advanced_tokens = @import("advanced_tokens.zig");
+const time_utils = @import("time_utils.zig");
 
 /// Zero-Knowledge Proof types supported
 pub const ZKProofType = enum {
@@ -29,7 +30,7 @@ pub const ZKProof = struct {
             .proof_type = proof_type,
             .proof_data = &[_]u8{},
             .verification_key = &[_]u8{},
-            .timestamp = std.time.milliTimestamp(),
+            .timestamp = time_utils.milliTimestamp(),
             .expires_at = null,
             .metadata = std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .allocator = allocator,
@@ -66,7 +67,7 @@ pub const ZKProof = struct {
 
     pub fn isExpired(self: *const ZKProof) bool {
         if (self.expires_at) |expiry| {
-            return std.time.milliTimestamp() > expiry;
+            return time_utils.milliTimestamp() > expiry;
         }
         return false;
     }
@@ -136,7 +137,7 @@ pub const AnonymousCredential = struct {
             .claims = std.HashMap([]const u8, ClaimValue, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .signature = &[_]u8{},
             .revocation_id = null,
-            .issued_at = std.time.milliTimestamp(),
+            .issued_at = time_utils.milliTimestamp(),
             .expires_at = null,
             .allocator = allocator,
         };
@@ -169,7 +170,7 @@ pub const AnonymousCredential = struct {
 
     pub fn isExpired(self: *const AnonymousCredential) bool {
         if (self.expires_at) |expiry| {
-            return std.time.milliTimestamp() > expiry;
+            return time_utils.milliTimestamp() > expiry;
         }
         return false;
     }
@@ -231,7 +232,7 @@ pub const ZKProofSystem = struct {
         try proof.addMetadata("proof_system", "groth16");
 
         // Set expiration to 1 hour
-        proof.expires_at = std.time.milliTimestamp() + (60 * 60 * 1000);
+        proof.expires_at = time_utils.milliTimestamp() + (60 * 60 * 1000);
 
         return proof;
     }
@@ -253,7 +254,7 @@ pub const ZKProofSystem = struct {
         try proof.addMetadata("permission_type", "hierarchical");
         try proof.addMetadata("proof_method", "bulletproof");
 
-        proof.expires_at = std.time.milliTimestamp() + (30 * 60 * 1000); // 30 minutes
+        proof.expires_at = time_utils.milliTimestamp() + (30 * 60 * 1000); // 30 minutes
 
         return proof;
     }
@@ -262,7 +263,7 @@ pub const ZKProofSystem = struct {
     pub fn generateAgeProof(self: *ZKProofSystem, birth_timestamp: i64, minimum_age: u32) !ZKProof {
         var proof = ZKProof.init(self.allocator, .age_verification);
 
-        const current_time = std.time.milliTimestamp();
+        const current_time = time_utils.milliTimestamp();
         const age_seconds = current_time - birth_timestamp;
         const age_years = @divTrunc(age_seconds, (365 * 24 * 60 * 60 * 1000));
 
@@ -280,7 +281,7 @@ pub const ZKProofSystem = struct {
             return error.AgeRequirementNotMet;
         }
 
-        proof.expires_at = std.time.milliTimestamp() + (24 * 60 * 60 * 1000); // 24 hours
+        proof.expires_at = time_utils.milliTimestamp() + (24 * 60 * 60 * 1000); // 24 hours
 
         return proof;
     }
@@ -350,7 +351,7 @@ pub const ZKProofSystem = struct {
         const count_str = try std.fmt.bufPrint(&count_buf, "{}", .{request.attributes_to_disclose.items.len});
         try proof.addMetadata("attribute_count", count_str);
 
-        proof.expires_at = std.time.milliTimestamp() + (60 * 60 * 1000); // 1 hour
+        proof.expires_at = time_utils.milliTimestamp() + (60 * 60 * 1000); // 1 hour
 
         return proof;
     }
@@ -359,7 +360,7 @@ pub const ZKProofSystem = struct {
     pub fn issueAnonymousCredential(self: *ZKProofSystem, issuer_did: []const u8, schema_id: []const u8, claims: std.HashMap([]const u8, AnonymousCredential.ClaimValue, std.hash_map.StringContext, std.hash_map.default_max_load_percentage)) !AnonymousCredential {
         // Generate unique credential ID
         var credential_id_buf: [64]u8 = undefined;
-        const credential_id = try std.fmt.bufPrint(&credential_id_buf, "anon_cred_{}", .{std.time.milliTimestamp()});
+        const credential_id = try std.fmt.bufPrint(&credential_id_buf, "anon_cred_{}", .{time_utils.milliTimestamp()});
 
         var credential = AnonymousCredential.init(self.allocator, credential_id, issuer_did, schema_id);
 
@@ -374,7 +375,7 @@ pub const ZKProofSystem = struct {
         try credential.setSignature(signature);
 
         // Set expiration to 1 year
-        credential.expires_at = std.time.milliTimestamp() + (365 * 24 * 60 * 60 * 1000);
+        credential.expires_at = time_utils.milliTimestamp() + (365 * 24 * 60 * 60 * 1000);
 
         return credential;
     }
@@ -464,7 +465,7 @@ test "age verification proof" {
     defer zk_system.deinit();
 
     // Birth timestamp for someone born 25 years ago
-    const birth_timestamp = std.time.milliTimestamp() - (25 * 365 * 24 * 60 * 60 * 1000);
+    const birth_timestamp = time_utils.milliTimestamp() - (25 * 365 * 24 * 60 * 60 * 1000);
 
     // Generate age proof for 18+ verification
     var age_proof = try zk_system.generateAgeProof(birth_timestamp, 18);

@@ -7,6 +7,7 @@ const identity = @import("identity.zig");
 const guardian = @import("guardian.zig");
 const advanced_tokens = @import("advanced_tokens.zig");
 const policy_engine = @import("policy_engine.zig");
+const time_utils = @import("time_utils.zig");
 
 /// DID Document structure
 pub const DIDDocument = struct {
@@ -70,8 +71,8 @@ pub const DIDDocument = struct {
             .services = std.ArrayList(ServiceEntry){},
             .authentication = std.ArrayList([]const u8){},
             .assertion_method = std.ArrayList([]const u8){},
-            .created = std.time.milliTimestamp(),
-            .updated = std.time.milliTimestamp(),
+            .created = time_utils.milliTimestamp(),
+            .updated = time_utils.milliTimestamp(),
             .version = 1,
             .allocator = allocator,
         };
@@ -125,7 +126,7 @@ pub const CacheEntry = struct {
     expires_at: i64,
 
     pub fn isExpired(self: *const CacheEntry) bool {
-        return std.time.milliTimestamp() > self.expires_at;
+        return time_utils.milliTimestamp() > self.expires_at;
     }
 };
 
@@ -252,13 +253,13 @@ pub const DIDResolver = struct {
 
     /// Batch resolve multiple DIDs
     pub fn batchResolveDIDs(self: *DIDResolver, request: BatchResolutionRequest) !BatchResolutionResponse {
-        const start_time = std.time.milliTimestamp();
+        const start_time = time_utils.milliTimestamp();
         var response = BatchResolutionResponse.init(self.allocator);
 
         response.metadata.total_requested = @intCast(request.dids.len);
 
         for (request.dids) |did| {
-            const resolve_start = std.time.milliTimestamp();
+            const resolve_start = time_utils.milliTimestamp();
 
             var result = BatchResolutionResponse.ResolutionResult{
                 .did = did,
@@ -298,7 +299,7 @@ pub const DIDResolver = struct {
                 }
             }
 
-            result.resolution_time_ms = @intCast(std.time.milliTimestamp() - resolve_start);
+            result.resolution_time_ms = @intCast(time_utils.milliTimestamp() - resolve_start);
 
             if (result.document != null) {
                 response.metadata.successful += 1;
@@ -309,7 +310,7 @@ pub const DIDResolver = struct {
             try response.results.append(self.allocator, result);
         }
 
-        response.metadata.total_time_ms = @intCast(std.time.milliTimestamp() - start_time);
+        response.metadata.total_time_ms = @intCast(time_utils.milliTimestamp() - start_time);
         return response;
     }
 
@@ -531,7 +532,7 @@ pub const DIDResolver = struct {
             }
         }
 
-        const expires_at = std.time.milliTimestamp() + (@as(i64, @intCast(self.cache_ttl_seconds)) * 1000);
+        const expires_at = time_utils.milliTimestamp() + (@as(i64, @intCast(self.cache_ttl_seconds)) * 1000);
         const cache_entry = CacheEntry{
             .document = document,
             .expires_at = expires_at,
@@ -633,7 +634,7 @@ pub const TransactionContext = struct {
             .currency = null,
             .requester_did = requester_did,
             .target_did = null,
-            .timestamp = std.time.milliTimestamp(),
+            .timestamp = time_utils.milliTimestamp(),
             .risk_score = 0.0,
             .compliance_flags = std.ArrayList(ComplianceFlag){},
             .allocator = allocator,

@@ -4,6 +4,7 @@
 const std = @import("std");
 const guardian = @import("guardian.zig");
 const advanced_tokens = @import("advanced_tokens.zig");
+const time_utils = @import("time_utils.zig");
 
 /// Policy template for common use cases
 pub const PolicyTemplate = struct {
@@ -208,8 +209,8 @@ pub const Policy = struct {
             .conditions = std.ArrayList(PolicyCondition){},
             .conflicts = std.ArrayList(PolicyConflict){},
             .version = 1,
-            .created_at = std.time.milliTimestamp(),
-            .updated_at = std.time.milliTimestamp(),
+            .created_at = time_utils.milliTimestamp(),
+            .updated_at = time_utils.milliTimestamp(),
             .allocator = allocator,
         };
     }
@@ -225,12 +226,12 @@ pub const Policy = struct {
 
     pub fn addPermission(self: *Policy, permission: PolicyPermission) !void {
         try self.permissions.append(self.allocator, permission);
-        self.updated_at = std.time.milliTimestamp();
+        self.updated_at = time_utils.milliTimestamp();
     }
 
     pub fn addCondition(self: *Policy, condition: PolicyCondition) !void {
         try self.conditions.append(self.allocator, condition);
-        self.updated_at = std.time.milliTimestamp();
+        self.updated_at = time_utils.milliTimestamp();
     }
 
     pub fn addConflict(self: *Policy, conflict: PolicyConflict) !void {
@@ -549,7 +550,7 @@ test "policy evaluation" {
     try policy.addPermission(policy_perm);
 
     const context = advanced_tokens.PermissionContext{
-        .timestamp = std.time.milliTimestamp(),
+        .timestamp = time_utils.milliTimestamp(),
         .transaction_amount = 100,
         .user_country = "US",
         .device_type = null,
@@ -587,7 +588,7 @@ test "policy engine with conflict resolution" {
     try engine.addPolicy("test", policy);
 
     const context = advanced_tokens.PermissionContext{
-        .timestamp = std.time.milliTimestamp(),
+        .timestamp = time_utils.milliTimestamp(),
         .transaction_amount = 100,
         .user_country = "US",
         .device_type = null,
